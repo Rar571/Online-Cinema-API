@@ -16,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.session_postgresql import Base
+from security.token import generate_token
 
 
 class UserGroupEnum(str, enum.Enum):
@@ -106,7 +107,9 @@ class ActivationTokenModel(Base):
     user: Mapped["UserModel"] = relationship(
         "UserModel", back_populates="activation_token"
     )
-    token: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    token: Mapped[str] = mapped_column(
+        String(64), default=generate_token, nullable=False, unique=True
+    )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc) + timedelta(days=1),
@@ -124,7 +127,9 @@ class PasswordResetTokenModel(Base):
     user: Mapped["UserModel"] = relationship(
         "UserModel", back_populates="password_reset_token"
     )
-    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    token: Mapped[str] = mapped_column(
+        String(64), default=generate_token, unique=True, nullable=False
+    )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -142,7 +147,9 @@ class RefreshTokenModel(Base):
     user: Mapped["UserModel"] = relationship(
         "UserModel", back_populates="password_reset_token"
     )
-    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    token: Mapped[str] = mapped_column(
+        String(64), default=generate_token, unique=True, nullable=False
+    )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

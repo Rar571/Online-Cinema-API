@@ -23,6 +23,6 @@ AsyncPostgresqlSessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 
-async def get_postgresql_db() -> AsyncGenerator[AsyncSession, None]:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncPostgresqlSessionLocal() as session:
         yield session
