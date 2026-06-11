@@ -2,8 +2,26 @@ import os
 from email.message import EmailMessage
 import smtplib
 from celery import Celery
+from celery.schedules import crontab
+from sqlalchemy import select, create_engine
+from datetime import datetime, timezone
 
-app = Celery("email_tasks", broker="redis://localhost:6379/0")
+from sqlalchemy.orm import sessionmaker
+
+from models.users import ActivationTokenModel
+
+
+app = Celery("tasks", broker="redis://localhost:6379/0")
+
+POSTGRESQL_DATABASE_URL = (
+    f"postgresql://{os.getenv("POSTGRES_USERNAME")}:"
+    f"{os.getenv("POSTGRES_PASSWORD")}@{os.getenv("POSTGRES_HOST")}:"
+    f"{os.getenv("POSTGRES_DB_PORT")}/{os.getenv("POSTGRES_DB")}"
+)
+
+engine = create_engine(POSTGRESQL_DATABASE_URL, echo=False)
+
+SessionLocal = sessionmaker(bind=engine)
 
 
 @app.task(bind=True, max_retries=3, default_retry_delay=60)
@@ -26,3 +44,27 @@ def send_email(self, subject: str, body: str, receiver_email: str):
             server.send_message(message)
     except Exception as exc:
         raise self.retry(exc=exc)
+
+
+@app.task()
+def delete_expired_activation_tokens():
+    db = SessionLocal()
+    result = db.execute(select(ActivationTokenModel).where(
+        ActivationTokenModel.expires_at < datetime.now(timezone.utc)
+    ))
+    activation_tokens = result.scalars().all()
+    try:
+        if activation_tokens:
+            for token in activation_tokens:
+                db.delete(token)
+            db.commit()
+    finally:
+        db.close()
+
+
+app.conf.beat_schedule = {
+    "clear_expired_activation_tokens": {
+        "celery": "celery.delete_expired_activation_tokens",
+        "schedule": crontab(hour=14, minute=0)
+    }
+}
