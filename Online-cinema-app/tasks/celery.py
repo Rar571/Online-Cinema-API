@@ -10,7 +10,6 @@ from sqlalchemy.orm import sessionmaker
 
 from models.users import ActivationTokenModel
 
-
 app = Celery("tasks", broker="redis://localhost:6379/0")
 
 POSTGRESQL_DATABASE_URL = (
@@ -49,9 +48,11 @@ def send_email(self, subject: str, body: str, receiver_email: str):
 @app.task()
 def delete_expired_activation_tokens():
     db = SessionLocal()
-    result = db.execute(select(ActivationTokenModel).where(
-        ActivationTokenModel.expires_at < datetime.now(timezone.utc)
-    ))
+    result = db.execute(
+        select(ActivationTokenModel).where(
+            ActivationTokenModel.expires_at < datetime.now(timezone.utc)
+        )
+    )
     activation_tokens = result.scalars().all()
     try:
         if activation_tokens:
@@ -65,6 +66,6 @@ def delete_expired_activation_tokens():
 app.conf.beat_schedule = {
     "clear_expired_activation_tokens": {
         "celery": "celery.delete_expired_activation_tokens",
-        "schedule": crontab(hour=14, minute=0)
+        "schedule": crontab(hour=14, minute=0),
     }
 }
