@@ -1,12 +1,16 @@
-from fastapi import Depends, HTTPException, APIRouter
-from sqlalchemy import select
+from fastapi import Depends, HTTPException, APIRouter, status
+from sqlalchemy import select, cast
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import cast
+
+from starlette.responses import JSONResponse
 
 from db.session_postgresql import get_db
 from models.users import UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel
-from schemas.users import UserRegistrationSchema
+from schemas.users import UserRegistrationSchema, UserActivationSchema, UserBaseSchema
 from security.passwords import hash_password
 from tasks.celery import send_email
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -21,7 +25,7 @@ async def register_user(
     existing_user = user_result.scalar_one_or_none()
     if existing_user:
         raise HTTPException(
-            status_code=409, detail="User with this email already exists"
+            status_code=status.HTTP_409_CONFLICT, detail="User with this email already exists"
         )
     result_group = await db.execute(
         select(UserGroupModel).where(UserGroupModel.name == UserGroupEnum.USER)
@@ -38,18 +42,74 @@ async def register_user(
         db.add(activation_token)
         send_email.delay(
             subject="Activation email",
-            body=f"Your activation token is: {activation_token.token}. This token is valid for 24 hours",
+            body=f"http://127.0.0.1:8000/activate?token={activation_token.token}. This link is valid for 24 hours",
             receiver_email=user_data.email,
         )
         await db.commit()
+        await db.refresh(new_user)
     except Exception:
+        await db.rollback()
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An error was occurred during user creation. Try again later.",
         )
     else:
-        return {
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=
             f"User was registered successfully. "
             f"The email with activation token has been "
-            f"already sent to your {user_data.email}"
-        }
+            f"already sent to your {user_data.email}")
+
+
+@router.post("/activation_token/")
+async def get_new_activation_token(user_data: UserBaseSchema, db: AsyncSession = Depends(get_db)):
+    user_result = await db.execute(select(UserModel).where(
+        UserModel.email == user_data.email
+    ))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User with the provided email is not registered, please register first.")
+    if user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already active")
+    token_result = await db.execute(select(ActivationTokenModel).where(
+        ActivationTokenModel.user_id == user.id
+    ))
+    token = token_result.scalar_one_or_none()
+    if token and cast(datetime, token.expires_at).replace(tzinfo=timezone.utc) > datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Your old token is still valid. Use it to activate your account.")
+    if token:
+        await db.delete(token)
+    new_token = ActivationTokenModel(
+        user_id=user.id
+    )
+    db.add(new_token)
+    send_email.delay(
+        subject="Activation email",
+        body=f"http://127.0.0.1:8000/activate?token={new_token.token}. This link is valid for 24 hours",
+        receiver_email=user.email
+    )
+    await db.commit()
+    await db.refresh(new_token)
+    return JSONResponse(status_code=status.HTTP_201_CREATED, content={"detail": f"New link has been already sent to your {user.email} to activate account. Use it for 24 hours."})
+
+
+@router.post("/activate/")
+async def activate_account(user_data: UserActivationSchema, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(UserModel).where(
+        UserModel.email == user_data.email,
+    ))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=400, detail="User with provided email is not registered")
+    result_token = await db.execute(select(ActivationTokenModel).where(
+        ActivationTokenModel.user_id == user.id,
+        ActivationTokenModel.token == user_data.token
+    ))
+    token = result_token.scalar_one_or_none()
+    if not token or cast(datetime, token.expires_at).replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Token is invalid or expired")
+    await db.delete(token)
+    if user.is_active:
+        raise HTTPException(status_code=400, detail="User is already active")
+    user.is_active = True
+    await db.commit()
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "Account has been activated."})

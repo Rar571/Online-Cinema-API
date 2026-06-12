@@ -8,3 +8,7 @@ class UserBaseSchema(BaseModel):
 
 class UserRegistrationSchema(UserBaseSchema):
     password: str
+
+
+class UserActivationSchema(UserBaseSchema):
+    token: str
