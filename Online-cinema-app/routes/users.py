@@ -1,10 +1,11 @@
-import jwt
-from fastapi import Depends, HTTPException, APIRouter, status
+import os
+
+from fastapi import Depends, HTTPException, APIRouter, status, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, cast
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import cast
-
+import jwt
 
 from db.session_postgresql import get_db
 from models.users import (
@@ -21,7 +22,7 @@ from schemas.users import (
     UserLoginSchema,
 )
 from security.passwords import hash_password, verify_password
-from security.token import generate_access_token, generate_refresh_token
+from security.token import generate_access_token, generate_refresh_token, decode_token
 from tasks.celery import send_email
 from datetime import datetime, timezone, timedelta
 
@@ -123,7 +124,7 @@ async def get_new_activation_token(
     )
 
 
-@router.post("/activate/")
+@router.get("/activate/")
 async def activate_account(
     user_data: UserActivationSchema, db: AsyncSession = Depends(get_db)
 ):
@@ -159,7 +160,7 @@ async def activate_account(
     )
 
 
-@router.post("/login/")
+@router.get("/login/")
 async def user_login(user_data: UserLoginSchema, db: AsyncSession = Depends(get_db)):
     user_result = await db.execute(
         select(UserModel).where(UserModel.email == user_data.email)
@@ -197,3 +198,24 @@ async def user_login(user_data: UserLoginSchema, db: AsyncSession = Depends(get_
     )
 
 
+@router.post("/logout/")
+async def user_logout(request: Request, db: AsyncSession = Depends(get_db)):
+    headers = request.headers.get("Authorization")
+    if not headers:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Authorization header format")
+    headers_list = headers.split()
+    if headers_list[0] != "Bearer" or len(headers_list) != 2:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Authorization header format")
+    access_token = headers_list[1]
+    try:
+        user_id = decode_token(access_token)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    refresh_token_result = await db.execute(select(RefreshTokenModel).where(
+        RefreshTokenModel.user_id == user_id
+    ))
+    refresh_token = refresh_token_result.scalar_one_or_none()
+    if refresh_token:
+       await db.delete(refresh_token)
+       await db.commit()
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "You have logged out"})
