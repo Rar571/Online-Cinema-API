@@ -1,9 +1,9 @@
 from fastapi import Depends, HTTPException, APIRouter, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import select, cast
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import cast
 
-from starlette.responses import JSONResponse
 
 from db.session_postgresql import get_db
 from models.users import UserModel, UserGroupModel, UserGroupEnum, ActivationTokenModel
