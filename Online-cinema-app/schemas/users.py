@@ -1,5 +1,4 @@
-from pydantic import BaseModel, field_validator, model_validator
-from pydantic.v1 import EmailStr
+from pydantic import BaseModel, field_validator, EmailStr
 
 from security.passwords import check_password_complexity
 
@@ -52,3 +51,17 @@ class UserChangePasswordSchema(BaseModel):
 
 class UserResetPasswordRequestSchema(UserBaseSchema):
     pass
+
+
+class UserResetPasswordCompleteSchema(UserBaseSchema):
+    new_password: str
+
+    @field_validator("new_password")
+    @staticmethod
+    def validate_password(password: str):
+        error_message = check_password_complexity(password)
+        if error_message:
+            raise ValueError(error_message)
+        return password
+
+    token: str

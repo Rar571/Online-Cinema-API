@@ -17,7 +17,7 @@ from schemas.users import (
     UserRegistrationSchema,
     UserActivationSchema,
     UserBaseSchema,
-    UserLoginSchema, UserChangePasswordSchema, UserResetPasswordRequestSchema,
+    UserLoginSchema, UserChangePasswordSchema, UserResetPasswordRequestSchema, UserResetPasswordCompleteSchema,
 )
 from security.passwords import hash_password, verify_password
 from security.token import generate_access_token, generate_refresh_token, decode_token
@@ -96,9 +96,7 @@ async def get_new_activation_token(
         select(ActivationTokenModel).where(ActivationTokenModel.user_id == user.id)
     )
     token = token_result.scalar_one_or_none()
-    if token and cast(datetime, token.expires_at).replace(
-        tzinfo=timezone.utc
-    ) > datetime.now(timezone.utc):
+    if token and token.expires_at > datetime.now(timezone.utc):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Your old token is still valid. Use it to activate your account.",
@@ -143,9 +141,7 @@ async def activate_account(
         )
     )
     token = result_token.scalar_one_or_none()
-    if not token or cast(datetime, token.expires_at).replace(
-        tzinfo=timezone.utc
-    ) < datetime.now(timezone.utc):
+    if not token or token.expires_at < datetime.now(timezone.utc):
         raise HTTPException(status_code=400, detail="Token is invalid or expired")
     await db.delete(token)
     if user.is_active:
@@ -253,9 +249,7 @@ async def reset_user_password_request(user_data: UserResetPasswordRequestSchema,
         UserModel.email == user_data.email
     ))
     user = user_result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"If your account is registered and active, the email with instructions was sent to your {user_data.email}")
-    if not user.is_active:
+    if not user or not user.is_active:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"If your account is registered and active, the email with instructions was sent to your {user_data.email}")
 
     old_reset_token_result = await db.execute(select(PasswordResetTokenModel).where(
@@ -264,12 +258,37 @@ async def reset_user_password_request(user_data: UserResetPasswordRequestSchema,
     old_reset_token = old_reset_token_result.scalar_one_or_none()
     if old_reset_token:
         await db.delete(old_reset_token)
+        await db.flush()
 
     reset_password_token = PasswordResetTokenModel(user_id=user.id)
     db.add(reset_password_token)
-    send_email.delay(subject="Reset Password Email",
-                     body=f"Your link to reset old password is: http://127.0.0.1:8000/users/reset-password?token={reset_password_token.token}",
-                     receiver_email=user.email)
     await db.commit()
     await db.refresh(reset_password_token)
+    send_email.delay(subject="Reset Password Email",
+                     body=f"Your link to reset old password is: http://127.0.0.1:8000/users/reset-password-complete?token={reset_password_token.token}",
+                     receiver_email=user.email)
     return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": f"If your account is registered and active, the email with instructions was sent to your {user_data.email}"})
+
+
+@router.post("/reset-password-complete/")
+async def reset_user_password_complete(user_data: UserResetPasswordCompleteSchema, db: AsyncSession = Depends(get_db)):
+    user_result = await db.execute(select(UserModel).where(
+        UserModel.email == user_data.email
+    ))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User with provided email is not registered")
+    reset_token_result = await db.execute(select(PasswordResetTokenModel).where(
+        PasswordResetTokenModel.user_id == user.id,
+        PasswordResetTokenModel.token == user_data.token
+    ))
+    reset_token = reset_token_result.scalar_one_or_none()
+    if not reset_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token is invalid")
+    if reset_token.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token is expired")
+    hashed_password = hash_password(user_data.new_password)
+    user.hashed_password = hashed_password
+    await db.delete(reset_token)
+    await db.commit()
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "Password was successfully changed"})
