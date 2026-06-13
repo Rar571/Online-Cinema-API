@@ -1,9 +1,8 @@
 from fastapi import Depends, HTTPException, APIRouter, status, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, cast
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import cast
-import jwt
+
 
 from db.session_postgresql import get_db
 from models.users import (
@@ -17,7 +16,7 @@ from schemas.users import (
     UserRegistrationSchema,
     UserActivationSchema,
     UserBaseSchema,
-    UserLoginSchema, UserChangePasswordSchema, UserResetPasswordRequestSchema, UserResetPasswordCompleteSchema,
+    UserLoginSchema, UserChangePasswordSchema, UserResetPasswordRequestSchema, UserResetPasswordCompleteSchema, UserRefreshAccessTokenSchema,
 )
 from security.passwords import hash_password, verify_password
 from security.token import generate_access_token, generate_refresh_token, decode_token
@@ -292,3 +291,23 @@ async def reset_user_password_complete(user_data: UserResetPasswordCompleteSchem
     await db.delete(reset_token)
     await db.commit()
     return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "Password was successfully changed"})
+
+
+@router.post("/refresh-access-token/")
+async def refresh_user_access_token(user_data: UserRefreshAccessTokenSchema, db: AsyncSession = Depends(get_db)):
+    refresh_token_result = await db.execute(select(RefreshTokenModel).where(
+        RefreshTokenModel.token == user_data.refresh_token
+    ))
+    refresh_token = refresh_token_result.scalar_one_or_none()
+    if not refresh_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is invalid")
+    if refresh_token.expires_at < datetime.now(timezone.utc):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is expired")
+    user_result = await db.execute(select(UserModel).where(
+        UserModel.id == refresh_token.user_id
+    ))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User with provided token is not registered")
+    access_token = generate_access_token({"sub": user.id})
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"access_token": access_token})

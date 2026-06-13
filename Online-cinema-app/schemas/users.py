@@ -65,3 +65,7 @@ class UserResetPasswordCompleteSchema(UserBaseSchema):
         return password
 
     token: str
+
+
+class UserRefreshAccessTokenSchema(BaseModel):
+    refresh_token: str
