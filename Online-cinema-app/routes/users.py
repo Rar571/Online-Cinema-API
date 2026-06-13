@@ -19,7 +19,7 @@ from schemas.users import (
     UserRegistrationSchema,
     UserActivationSchema,
     UserBaseSchema,
-    UserLoginSchema,
+    UserLoginSchema, UserChangePasswordSchema,
 )
 from security.passwords import hash_password, verify_password
 from security.token import generate_access_token, generate_refresh_token, decode_token
@@ -219,3 +219,31 @@ async def user_logout(request: Request, db: AsyncSession = Depends(get_db)):
        await db.delete(refresh_token)
        await db.commit()
     return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "You have logged out"})
+
+
+@router.post("/change-password/")
+async def change_user_password(request: Request, user_data: UserChangePasswordSchema, db: AsyncSession = Depends(get_db)):
+    headers = request.headers.get("Authorization")
+    if not headers:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Authorization header format")
+    headers_list = headers.split()
+    if len(headers_list) != 2 or headers_list[0] != "Bearer":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Authorization header format")
+    access_token = headers_list[1]
+    try:
+        user_id = decode_token(access_token)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
+    user_result = await db.execute(select(UserModel).where(
+        UserModel.id == user_id
+    ))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is not registered")
+    hashed_password = user.hashed_password
+    if not verify_password(user_data.old_password, hashed_password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Old password is incorrect")
+    new_hashed_password = hash_password(user_data.new_password)
+    user.hashed_password = new_hashed_password
+    await db.commit()
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "password was changed successfully"})

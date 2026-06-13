@@ -1,7 +1,7 @@
-import re
-
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 from pydantic.v1 import EmailStr
+
+from security.passwords import check_password_complexity
 
 
 class UserBaseSchema(BaseModel):
@@ -14,18 +14,9 @@ class UserRegistrationSchema(UserBaseSchema):
     @field_validator("password")
     @staticmethod
     def validate_password(password: str):
-        if len(password) < 8:
-            raise ValueError("Password must contain at least 8 characters.")
-        if not re.search(r"[A-Z]", password):
-            raise ValueError("Password must have at least one uppercase letter")
-        if not re.search(r"[a-z]", password):
-            raise ValueError("Password must have at least one lowercase letter")
-        if not re.search(r"\d", password):
-            raise ValueError("Password must have at least one digit")
-        if not re.search(r"[@$!%*?&#]", password):
-            raise ValueError(
-                "Password must contains at least one special character: @, $, !, %, *, ?, &, #."
-            )
+        error_message = check_password_complexity(password)
+        if error_message:
+            raise ValueError(error_message)
         return password
 
 
@@ -35,3 +26,25 @@ class UserActivationSchema(UserBaseSchema):
 
 class UserLoginSchema(UserRegistrationSchema):
     pass
+
+
+class UserChangePasswordSchema(BaseModel):
+    old_password: str
+
+    @field_validator("old_password")
+    @staticmethod
+    def validate_password(password: str):
+        error_message = check_password_complexity(password)
+        if error_message:
+            raise ValueError(error_message)
+        return password
+
+    new_password: str
+
+    @field_validator("new_password")
+    @staticmethod
+    def validate_password(password: str):
+        error_message = check_password_complexity(password)
+        if error_message:
+            raise ValueError(error_message)
+        return password
