@@ -148,7 +148,7 @@ class RefreshTokenModel(Base):
         "UserModel", back_populates="password_reset_token"
     )
     token: Mapped[str] = mapped_column(
-        String(64), default=generate_token, unique=True, nullable=False
+        String(64), unique=True, nullable=False
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

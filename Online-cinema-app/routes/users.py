@@ -1,5 +1,3 @@
-import os
-
 from fastapi import Depends, HTTPException, APIRouter, status, Request
 from fastapi.responses import JSONResponse
 from sqlalchemy import select, cast
@@ -13,13 +11,13 @@ from models.users import (
     UserGroupModel,
     UserGroupEnum,
     ActivationTokenModel,
-    RefreshTokenModel,
+    RefreshTokenModel, PasswordResetTokenModel,
 )
 from schemas.users import (
     UserRegistrationSchema,
     UserActivationSchema,
     UserBaseSchema,
-    UserLoginSchema, UserChangePasswordSchema,
+    UserLoginSchema, UserChangePasswordSchema, UserResetPasswordRequestSchema,
 )
 from security.passwords import hash_password, verify_password
 from security.token import generate_access_token, generate_refresh_token, decode_token
@@ -57,7 +55,7 @@ async def register_user(
         db.add(activation_token)
         send_email.delay(
             subject="Activation email",
-            body=f"http://127.0.0.1:8000/activate?token={activation_token.token}. This link is valid for 24 hours",
+            body=f"http://127.0.0.1:8000/users/activate?token={activation_token.token}. This link is valid for 24 hours",
             receiver_email=user_data.email,
         )
         await db.commit()
@@ -111,7 +109,7 @@ async def get_new_activation_token(
     db.add(new_token)
     send_email.delay(
         subject="Activation email",
-        body=f"http://127.0.0.1:8000/activate?token={new_token.token}. This link is valid for 24 hours",
+        body=f"http://127.0.0.1:8000/users/activate?token={new_token.token}. This link is valid for 24 hours",
         receiver_email=user.email,
     )
     await db.commit()
@@ -247,3 +245,31 @@ async def change_user_password(request: Request, user_data: UserChangePasswordSc
     user.hashed_password = new_hashed_password
     await db.commit()
     return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "password was changed successfully"})
+
+
+@router.post("/reset-password-request/")
+async def reset_user_password_request(user_data: UserResetPasswordRequestSchema, db: AsyncSession = Depends(get_db)):
+    user_result = await db.execute(select(UserModel).where(
+        UserModel.email == user_data.email
+    ))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"If your account is registered and active, the email with instructions was sent to your {user_data.email}")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"If your account is registered and active, the email with instructions was sent to your {user_data.email}")
+
+    old_reset_token_result = await db.execute(select(PasswordResetTokenModel).where(
+        PasswordResetTokenModel.user_id == user.id
+    ))
+    old_reset_token = old_reset_token_result.scalar_one_or_none()
+    if old_reset_token:
+        await db.delete(old_reset_token)
+
+    reset_password_token = PasswordResetTokenModel(user_id=user.id)
+    db.add(reset_password_token)
+    send_email.delay(subject="Reset Password Email",
+                     body=f"Your link to reset old password is: http://127.0.0.1:8000/users/reset-password?token={reset_password_token.token}",
+                     receiver_email=user.email)
+    await db.commit()
+    await db.refresh(reset_password_token)
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": f"If your account is registered and active, the email with instructions was sent to your {user_data.email}"})

@@ -48,3 +48,7 @@ class UserChangePasswordSchema(BaseModel):
         if error_message:
             raise ValueError(error_message)
         return password
+
+
+class UserResetPasswordRequestSchema(UserBaseSchema):
+    pass
