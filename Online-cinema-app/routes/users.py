@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 from db.session_postgresql import get_db
+from dependencies.authorization import require_admin, group_admins_id, group_moderators_id, group_users_id
 from models.users import (
     UserModel,
     UserGroupModel,
@@ -311,3 +312,69 @@ async def refresh_user_access_token(user_data: UserRefreshAccessTokenSchema, db:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User with provided token is not registered")
     access_token = generate_access_token({"sub": user.id})
     return JSONResponse(status_code=status.HTTP_200_OK, content={"access_token": access_token})
+
+
+@router.post("/{user_id}/make-admin/")
+async def make_admin(user_id: int, current_user = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    if user_id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You can not change your own group")
+    current_user_result = await db.execute(select(UserModel).where(
+        UserModel.id == user_id
+    ))
+    current_user_model = current_user_result.scalar_one_or_none()
+    if not current_user_model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User is not found")
+    if current_user_model.group_id == group_admins_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already an admin")
+    current_user_model.group_id = group_admins_id
+    await db.commit()
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "User's group was changed to 'admin'"})
+
+
+@router.post("/{user_id}/make-moderator/")
+async def make_moderator(user_id: int, current_user = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    if user_id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You can not change your own group")
+    current_user_result = await db.execute(select(UserModel).where(
+        UserModel.id == user_id
+    ))
+    current_user_model = current_user_result.scalar_one_or_none()
+    if not current_user_model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User is not found")
+    if current_user_model.group_id == group_moderators_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already a moderator")
+    current_user_model.group_id = group_moderators_id
+    await db.commit()
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "User's group was changed to 'moderator'"})
+
+
+@router.post("/{user_id}/make-user/")
+async def make_user(user_id: int, current_user = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    if user_id == current_user.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You can not change your own group")
+    current_user_result = await db.execute(select(UserModel).where(
+        UserModel.id == user_id
+    ))
+    current_user_model = current_user_result.scalar_one_or_none()
+    if not current_user_model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User is not found")
+    if current_user_model.group_id == group_users_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already in users group")
+    current_user_model.group_id = group_users_id
+    await db.commit()
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "User's group was changed to 'user'"})
+
+
+@router.post("/{user_id}/activate_user/")
+async def activate_user_by_id(user_id: int, current_user = Depends(require_admin), db: AsyncSession = Depends(get_db)):
+    user_result = await db.execute(select(UserModel).where(
+        UserModel.id == user_id
+    ))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User is not found")
+    if user.is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User is already active")
+    user.is_active = True
+    await db.commit()
+    return JSONResponse(status_code=status.HTTP_200_OK, content={"detail": "User has been activated"})
