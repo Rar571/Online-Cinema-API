@@ -75,7 +75,7 @@ class UserModel(Base):
         "RefreshTokenModel", back_populates="user", cascade="all, delete-orphan"
     )
     password_reset_token: Mapped[List["PasswordResetTokenModel"]] = relationship(
-        "PasswordResetTokenModel", back_populates="user", cascade="all, delete-orphans"
+        "PasswordResetTokenModel", back_populates="user", cascade="all, delete-orphan"
     )
 
 
