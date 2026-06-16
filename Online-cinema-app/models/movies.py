@@ -1,7 +1,9 @@
+import enum
 from typing import List, Optional
 from decimal import Decimal
 
 from sqlalchemy import (
+    Enum,
     Integer,
     String,
     Float,
@@ -15,6 +17,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.session_postgresql import Base
+from models.users import UserModel
 
 movie_genres = Table(
     "movie_genres",
@@ -38,6 +41,11 @@ movie_directors = Table(
     Column("movie_id", Integer, ForeignKey("movies.id"), primary_key=True),
     Column("director_id", Integer, ForeignKey("directors.id"), primary_key=True),
 )
+
+
+class LikeTypeEnum(str, enum.Enum):
+    LIKE = "like"
+    DISLIKE = "dislike"
 
 
 class GenreModel(Base):
@@ -126,3 +134,18 @@ class MovieModel(Base):
     )
 
     __table_args__ = UniqueConstraint("name", "year", "time", name="unique_movie")
+
+
+class LikeAndDislikeModel(Base):
+    __tablename__ = "likes_and_dislikes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    like_type: Mapped[LikeTypeEnum] = mapped_column(Enum(LikeTypeEnum), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user: Mapped[UserModel] = relationship(UserModel, back_populates="user_likes_and_dislikes")
+    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
+    movie: Mapped[MovieModel] = relationship(MovieModel, back_populates="movie_likes_and_dislikes")
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "movie_id", name="unique_movie_user_like")
+    )
