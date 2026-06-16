@@ -141,11 +141,19 @@ class LikeAndDislikeModel(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     like_type: Mapped[LikeTypeEnum] = mapped_column(Enum(LikeTypeEnum), nullable=False)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    user: Mapped[UserModel] = relationship(UserModel, back_populates="user_likes_and_dislikes")
-    movie_id: Mapped[int] = mapped_column(ForeignKey("movies.id", ondelete="CASCADE"), nullable=False)
-    movie: Mapped[MovieModel] = relationship(MovieModel, back_populates="movie_likes_and_dislikes")
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    user: Mapped[UserModel] = relationship(
+        UserModel, back_populates="user_likes_and_dislikes"
+    )
+    movie_id: Mapped[int] = mapped_column(
+        ForeignKey("movies.id", ondelete="CASCADE"), nullable=False
+    )
+    movie: Mapped[MovieModel] = relationship(
+        MovieModel, back_populates="movie_likes_and_dislikes"
+    )
 
-    __table_args__ = (
-        UniqueConstraint("user_id", "movie_id", name="unique_movie_user_like")
+    __table_args__ = UniqueConstraint(
+        "user_id", "movie_id", name="unique_movie_user_like"
     )

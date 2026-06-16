@@ -1,10 +1,16 @@
-from fastapi import HTTPException, status, Request
+from fastapi import HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-
-from models.movies import MovieModel, StarModel, DirectorModel
+from models.movies import (
+    MovieModel,
+    StarModel,
+    DirectorModel,
+    LikeAndDislikeModel,
+    LikeTypeEnum,
+)
+from models.users import UserModel
 from schemas.movies import (
     MovieCreateSchema,
     MovieDetailSchema,
@@ -124,3 +130,43 @@ async def movie_delete(movie_id: int, db: AsyncSession):
     await db.delete(movie)
     await db.commit()
     return await get_movies_list(db=db)
+
+
+async def like_or_dislike_movie(
+    movie_id, like_type: LikeTypeEnum, db: AsyncSession, current_user: UserModel
+):
+    movie_result = await db.execute(select(MovieModel).where(MovieModel.id == movie_id))
+    movie = movie_result.scalar_one_or_none()
+    if not movie:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found"
+        )
+    existing_like = await db.execute(
+        select(LikeAndDislikeModel).where(
+            LikeAndDislikeModel.user_id == current_user.id,
+            LikeAndDislikeModel.movie_id == movie_id,
+        )
+    )
+    existing_like_model = existing_like.scalar_one_or_none()
+    if existing_like_model:
+        if existing_like_model.like_type == like_type:
+            await db.delete(existing_like_model)
+            await db.commit()
+        else:
+            existing_like_model.like_type = like_type
+            await db.commit()
+    else:
+        like_or_dislike = LikeAndDislikeModel(
+            like_type=like_type, user_id=current_user.id, movie_id=movie_id
+        )
+        db.add(like_or_dislike)
+        await db.commit()
+        await db.refresh(like_or_dislike)
+    total_movie_likes = await db.execute(
+        select(func.count(LikeAndDislikeModel.id)).where(
+            LikeAndDislikeModel.movie_id == movie.id,
+            LikeAndDislikeModel.like_type == like_type,
+        )
+    )
+    movie_likes = total_movie_likes.scalar()
+    return movie_likes
