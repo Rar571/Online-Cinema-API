@@ -2,13 +2,14 @@ from fastapi import HTTPException, status
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.responses import JSONResponse
 
+from dependencies.movies import filter_sort_search_movies
 from models.movies import (
     MovieModel,
-    StarModel,
-    DirectorModel,
     LikeAndDislikeModel,
     LikeTypeEnum,
+    FavoriteMovieModel,
 )
 from models.users import UserModel
 from schemas.movies import (
@@ -16,6 +17,8 @@ from schemas.movies import (
     MovieDetailSchema,
     MovieUpdateSchema,
     MovieListSchema,
+    FavoriteMovieAddOrDeleteSchema,
+    FavoriteMovieListSchema,
 )
 
 
@@ -32,38 +35,20 @@ async def get_movies_list(
     sort_field: str = "id",
     sort_order: str = "asc",
 ):
-    offset = (page - 1) * limit
-    movies_table = select(MovieModel).offset(offset).limit(limit)
-    if year:
-        movies_table = movies_table.filter_by(year=year)
-    if imdb:
-        movies_table = movies_table.filter_by(imdb=imdb)
-    if name:
-        movies_table = movies_table.filter(MovieModel.name.ilike(f"%{name}%"))
-    if actor_name:
-        movies_table = movies_table.filter(
-            MovieModel.stars.any(StarModel.name.ilike(f"%{actor_name}%"))
-        )
-    if description:
-        movies_table = movies_table.filter(
-            MovieModel.description.ilike(f"%{description}%")
-        )
-    if director_name:
-        movies_table = movies_table.filter(
-            MovieModel.directors.any(DirectorModel.name.ilike(f"%{director_name}%"))
-        )
-    valid_fields = {"id", "price", "time"}
-    if sort_field not in valid_fields:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="You can only sort movies by price and time",
-        )
-    if sort_order == "asc":
-        movies_table = movies_table.order_by(getattr(MovieModel, sort_field).asc())
-    else:
-        movies_table = movies_table.order_by(getattr(MovieModel, sort_field).desc())
-    movies_result = await db.execute(movies_table)
-    movies = movies_result.scalars().all()
+    movies = await filter_sort_search_movies(
+        db=db,
+        movie_model=MovieModel,
+        name=name,
+        description=description,
+        actor_name=actor_name,
+        director_name=director_name,
+        year=year,
+        imdb=imdb,
+        page=page,
+        limit=limit,
+        sort_field=sort_field,
+        sort_order=sort_order,
+    )
     if not movies:
         movies = []
         return movies
@@ -170,3 +155,109 @@ async def like_or_dislike_movie(
     )
     movie_likes = total_movie_likes.scalar()
     return movie_likes
+
+
+async def list_favorite_movies(
+    db: AsyncSession,
+    current_user: UserModel,
+    name: str | None = None,
+    description: str | None = None,
+    actor_name: str | None = None,
+    director_name: str | None = None,
+    year: int | None = None,
+    imdb: float | None = None,
+    page: int = 1,
+    limit: int = 10,
+    sort_field: str = "id",
+    sort_order: str = "asc",
+):
+    movies = await filter_sort_search_movies(
+        db=db,
+        movie_model=FavoriteMovieModel,
+        user_id=current_user.id,
+        name=name,
+        description=description,
+        actor_name=actor_name,
+        director_name=director_name,
+        year=year,
+        imdb=imdb,
+        page=page,
+        limit=limit,
+        sort_field=sort_field,
+        sort_order=sort_order,
+    )
+    if not movies:
+        return JSONResponse(
+            status_code=status.HTTP_200_OK, content={"detail": "There are no favorites"}
+        )
+    movies_list = [
+        FavoriteMovieListSchema.model_validate(movie, from_attributes=True)
+        for movie in movies
+    ]
+    total = await db.execute(
+        select(func.count(FavoriteMovieModel.id)).where(
+            FavoriteMovieModel.user_id == current_user.id
+        )
+    )
+    total_count = total.scalar()
+    return {"items": movies_list, "total": total_count, "page": page, "limit": limit}
+
+
+async def add_favorite_movie(
+    movie_data: FavoriteMovieAddOrDeleteSchema,
+    db: AsyncSession,
+    current_user: UserModel,
+):
+    movie_result = await db.execute(
+        select(MovieModel).where(MovieModel.id == movie_data.movie_id)
+    )
+    movie = movie_result.scalar_one_or_none()
+    if not movie:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found"
+        )
+    existing_favorite_movie = await db.execute(
+        select(FavoriteMovieModel).where(
+            FavoriteMovieModel.movie_id == movie_data.movie_id,
+            FavoriteMovieModel.user_id == current_user.id,
+        )
+    )
+    existing_favorite = existing_favorite_movie.scalar_one_or_none()
+    if existing_favorite:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Movie is already in favorites",
+        )
+    new_favorite_movie = FavoriteMovieModel(movie_id=movie.id, user_id=current_user.id)
+    db.add(new_favorite_movie)
+    await db.commit()
+    await db.refresh(new_favorite_movie)
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content={"detail": "Movie added to favorites"},
+    )
+
+
+async def delete_favorite_movie(
+    movie_data: FavoriteMovieAddOrDeleteSchema,
+    db: AsyncSession,
+    current_user: UserModel,
+):
+    existing_favorite_movie = await db.execute(
+        select(FavoriteMovieModel).where(
+            FavoriteMovieModel.movie_id == movie_data.movie_id,
+            FavoriteMovieModel.user_id == current_user.id,
+        )
+    )
+    existing_favorite = existing_favorite_movie.scalar_one_or_none()
+    if existing_favorite:
+        await db.delete(existing_favorite)
+        await db.commit()
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"detail": "Movie was removed from favorites"},
+        )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found"
+        )

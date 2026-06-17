@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from crud.movies import (
@@ -8,17 +8,23 @@ from crud.movies import (
     movie_update,
     movie_delete,
     like_or_dislike_movie,
+    add_favorite_movie,
+    delete_favorite_movie,
 )
 from db.session_postgresql import get_db
 from dependencies.users import get_current_user_model
 from models.movies import LikeTypeEnum
 from models.users import UserModel
-from schemas.movies import MovieCreateSchema, MovieUpdateSchema
+from schemas.movies import (
+    MovieCreateSchema,
+    MovieUpdateSchema,
+    FavoriteMovieAddOrDeleteSchema,
+)
 
 router = APIRouter()
 
 
-@router.get("/movies/", status_code=200)
+@router.get("/movies/", status_code=status.HTTP_200_OK)
 async def movies_list(
     name: str | None = None,
     description: str | None = None,
@@ -47,31 +53,31 @@ async def movies_list(
     )
 
 
-@router.post("/movies/", status_code=201)
+@router.post("/movies/", status_code=status.HTTP_201_CREATED)
 async def movie_create(
     movie_data: MovieCreateSchema, db: AsyncSession = Depends(get_db)
 ):
     return await create_movie(movie_data=movie_data, db=db)
 
 
-@router.get("/movies/{movie_id}/", status_code=200)
+@router.get("/movies/{movie_id}/", status_code=status.HTTP_200_OK)
 async def movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
     return await movie_detail(movie_id=movie_id, db=db)
 
 
-@router.patch("/movies/{movie_id}/", status_code=200)
+@router.patch("/movies/{movie_id}/", status_code=status.HTTP_200_OK)
 async def update_movie(
     movie_id: int, movie_data: MovieUpdateSchema, db: AsyncSession = Depends(get_db)
 ):
     return await movie_update(movie_id=movie_id, movie_data=movie_data, db=db)
 
 
-@router.delete("/movies/{movie_id}/", status_code=200)
+@router.delete("/movies/{movie_id}/", status_code=status.HTTP_200_OK)
 async def delete_movie(movie_id, db: AsyncSession = Depends(get_db)):
     return await movie_delete(movie_id=movie_id, db=db)
 
 
-@router.post("/movies/{movie_id}/like/", status_code=200)
+@router.post("/movies/{movie_id}/like/", status_code=status.HTTP_200_OK)
 async def like_and_dislike(
     movie_id: int,
     like_type: LikeTypeEnum,
@@ -80,4 +86,34 @@ async def like_and_dislike(
 ):
     return await like_or_dislike_movie(
         movie_id=movie_id, like_type=like_type, db=db, current_user=current_user
+    )
+
+
+@router.get("/movies/favorites/", status_code=status.HTTP_200_OK)
+async def favorite_movies_list(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user_model),
+):
+    return await favorite_movies_list(db=db, current_user=current_user)
+
+
+@router.post("/movies/favorites/", status_code=status.HTTP_201_CREATED)
+async def add_favorite_movie(
+    movie_data: FavoriteMovieAddOrDeleteSchema,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user_model),
+):
+    return await add_favorite_movie(
+        movie_data=movie_data, db=db, current_user=current_user
+    )
+
+
+@router.delete("/movies/favorites/", status_code=status.HTTP_200_OK)
+async def delete_favorite_movie(
+    movie_data: FavoriteMovieAddOrDeleteSchema,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user_model),
+):
+    return await delete_favorite_movie(
+        movie_data=movie_data, db=db, current_user=current_user
     )

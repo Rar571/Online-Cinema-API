@@ -10,7 +10,6 @@ class CertificationSchema(BaseModel):
 
 
 class MovieSchema(BaseModel):
-    id: int
     uuid: str
     name: str
     year: int
@@ -25,27 +24,20 @@ class MovieSchema(BaseModel):
 
 
 class MovieListSchema(MovieSchema):
+    id: int
+
     model_config = ConfigDict(from_attributes=True)
 
 
 class MovieDetailSchema(MovieSchema):
+    id: int
     certification: CertificationSchema
 
     model_config = ConfigDict(from_attributes=True)
 
 
 class MovieCreateSchema(MovieSchema):
-    uuid: str
-    name: str
-    year: int
-    time: int
-    imdb: float
-    votes: int
-    meta_score: Optional[float] = None
-    gross: Optional[float] = None
-    description: str
-    price: Decimal
-    certification_id: int
+    pass
 
 
 class MovieUpdateSchema(MovieSchema):
@@ -60,3 +52,11 @@ class MovieUpdateSchema(MovieSchema):
     description: Optional[str] = None
     price: Optional[Decimal] = None
     certification_id: Optional[int] = None
+
+
+class FavoriteMovieListSchema(MovieListSchema):
+    pass
+
+
+class FavoriteMovieAddOrDeleteSchema(BaseModel):
+    movie_id: int

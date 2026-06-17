@@ -157,3 +157,19 @@ class LikeAndDislikeModel(Base):
     __table_args__ = UniqueConstraint(
         "user_id", "movie_id", name="unique_movie_user_like"
     )
+
+
+class FavoriteMovieModel(MovieModel):
+    __tablename__ = "favorites"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    movie_id: Mapped[int] = mapped_column(
+        ForeignKey("movies.id", ondelete="CASCADE"), nullable=False
+    )
+    movie: Mapped[MovieModel] = relationship(
+        MovieModel, back_populates="favorite_movies"
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    user: Mapped[UserModel] = relationship(UserModel, back_populates="favorite_movies")
