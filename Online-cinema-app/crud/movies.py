@@ -10,6 +10,7 @@ from models.movies import (
     LikeAndDislikeModel,
     LikeTypeEnum,
     FavoriteMovieModel,
+    GenreModel,
 )
 from models.users import UserModel
 from schemas.movies import (
@@ -19,6 +20,8 @@ from schemas.movies import (
     MovieListSchema,
     FavoriteMovieAddOrDeleteSchema,
     FavoriteMovieListSchema,
+    GenreListSchema,
+    GenreSchema,
 )
 
 
@@ -261,3 +264,70 @@ async def delete_favorite_movie(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found"
         )
+
+
+async def get_genres_list(db: AsyncSession):
+    genres_result = await db.execute(
+        select(
+            GenreModel.id,
+            GenreModel.name,
+            func.count(MovieModel.id).label("related_movies"),
+        )
+        .outerjoin(GenreModel.movies)
+        .group_by(GenreModel.id)
+    )
+    genres = genres_result.all()
+    if not genres:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="There are no genres"
+        )
+    genres_list = [
+        GenreListSchema(id=row[0], name=row[1], related_movies=row[2]) for row in genres
+    ]
+    return genres_list
+
+
+async def create_genre(genre_data: GenreSchema, db: AsyncSession):
+    genre = GenreModel(name=genre_data.name)
+    db.add(genre)
+    await db.commit()
+    await db.refresh(genre)
+    genre_schema = GenreListSchema.model_validate(genre, from_attributes=True)
+    return genre_schema
+
+
+async def detail_genre(genre_id, db: AsyncSession):
+    genre_result = await db.execute(select(GenreModel).where(GenreModel.id == genre_id))
+    genre = genre_result.scalar_one_or_none()
+    if not genre:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Genre not found"
+        )
+    genre_schema = GenreListSchema.model_validate(genre, from_attributes=True)
+    return genre_schema
+
+
+async def update_genre(genre_id: int, genre_data: GenreSchema, db: AsyncSession):
+    genre_result = await db.execute(select(GenreModel).where(GenreModel.id == genre_id))
+    genre = genre_result.scalar_one_or_none()
+    if not genre:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Genre not found"
+        )
+    genre.name = genre_data.name
+    await db.commit()
+    await db.refresh(genre)
+    genre_schema = GenreListSchema.model_validate(genre, from_attributes=True)
+    return genre_schema
+
+
+async def delete_genre(genre_id, db: AsyncSession):
+    genre_result = await db.execute(select(GenreModel).where(GenreModel.id == genre_id))
+    genre = genre_result.scalar_one_or_none()
+    if not genre:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Genre not found"
+        )
+    await db.delete(genre)
+    await db.commit()
+    return await get_genres_list(db=db)

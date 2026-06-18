@@ -1,5 +1,7 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
 
 from crud.movies import (
     get_movies_list,
@@ -10,15 +12,21 @@ from crud.movies import (
     like_or_dislike_movie,
     add_favorite_movie,
     delete_favorite_movie,
+    get_genres_list,
+    create_genre,
+    update_genre,
+    delete_genre,
+    detail_genre,
 )
 from db.session_postgresql import get_db
 from dependencies.users import get_current_user_model
-from models.movies import LikeTypeEnum
+from models.movies import LikeTypeEnum, MovieModel, GenreModel
 from models.users import UserModel
 from schemas.movies import (
     MovieCreateSchema,
     MovieUpdateSchema,
     FavoriteMovieAddOrDeleteSchema,
+    GenreSchema,
 )
 
 router = APIRouter()
@@ -117,3 +125,50 @@ async def delete_favorite_movie(
     return await delete_favorite_movie(
         movie_data=movie_data, db=db, current_user=current_user
     )
+
+
+@router.get("/genres/", status_code=status.HTTP_200_OK)
+async def genres_list(db: AsyncSession = Depends(get_db)):
+    return await get_genres_list(db=db)
+
+
+@router.post("/genres/", status_code=status.HTTP_201_CREATED)
+async def genre_create(genre_data: GenreSchema, db: AsyncSession = Depends(get_db)):
+    return await create_genre(genre_data=genre_data, db=db)
+
+
+@router.get("/genres/{genre_id}/", status_code=status.HTTP_200_OK)
+async def genre_detail(genre_id: int, db: AsyncSession = Depends(get_db)):
+    return await detail_genre(genre_id=genre_id, db=db)
+
+
+@router.get("/genres/{genre_id}/movies/", status_code=status.HTTP_200_OK)
+async def get_related_movies(genre_id: int, db: AsyncSession = Depends(get_db)):
+    genre_result = await db.execute(select(GenreModel).where(GenreModel.id == genre_id))
+    genre = genre_result.scalar_one_or_none()
+    if not genre:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Genre not found"
+        )
+    movies_result = await db.execute(
+        select(MovieModel).filter(MovieModel.genres.any(GenreModel.name == genre.name))
+    )
+    movies = movies_result.scalars().all()
+    if not movies:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="There are no related movies with this genre",
+        )
+    return movies
+
+
+@router.patch("/genres/{genre_id}/", status_code=status.HTTP_200_OK)
+async def genre_update(
+    genre_id: int, genre_data: GenreSchema, db: AsyncSession = Depends(get_db)
+):
+    return await update_genre(genre_id=genre_id, genre_data=genre_data, db=db)
+
+
+@router.delete("/genres/{genre_id}/", status_code=status.HTTP_200_OK)
+async def genre_delete(genre_id: int, db: AsyncSession = Depends(get_db)):
+    return await delete_genre(genre_id=genre_id, db=db)

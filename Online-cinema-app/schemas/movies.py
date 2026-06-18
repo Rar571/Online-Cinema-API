@@ -60,3 +60,14 @@ class FavoriteMovieListSchema(MovieListSchema):
 
 class FavoriteMovieAddOrDeleteSchema(BaseModel):
     movie_id: int
+
+
+class GenreSchema(BaseModel):
+    name: str
+
+
+class GenreListSchema(GenreSchema):
+    id: int
+    related_movies: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
