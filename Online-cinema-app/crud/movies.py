@@ -11,6 +11,7 @@ from models.movies import (
     LikeTypeEnum,
     FavoriteMovieModel,
     GenreModel,
+    RateMovieModel,
 )
 from models.users import UserModel
 from schemas.movies import (
@@ -22,6 +23,7 @@ from schemas.movies import (
     FavoriteMovieListSchema,
     GenreListSchema,
     GenreSchema,
+    RateCreateSchema,
 )
 
 
@@ -121,7 +123,7 @@ async def movie_delete(movie_id: int, db: AsyncSession):
 
 
 async def like_or_dislike_movie(
-    movie_id, like_type: LikeTypeEnum, db: AsyncSession, current_user: UserModel
+    movie_id: int, like_type: LikeTypeEnum, db: AsyncSession, current_user: UserModel
 ):
     movie_result = await db.execute(select(MovieModel).where(MovieModel.id == movie_id))
     movie = movie_result.scalar_one_or_none()
@@ -331,3 +333,43 @@ async def delete_genre(genre_id, db: AsyncSession):
     await db.delete(genre)
     await db.commit()
     return await get_genres_list(db=db)
+
+
+async def rate_movie(
+    rate_data: RateCreateSchema,
+    movie_id: int,
+    db: AsyncSession,
+    current_user: UserModel,
+):
+    rate_result = await db.execute(
+        select(RateMovieModel).where(
+            RateMovieModel.movie_id == movie_id,
+            RateMovieModel.user_id == current_user.id,
+        )
+    )
+    rate_model = rate_result.scalar_one_or_none()
+    if rate_model:
+        if rate_model.rate == rate_data.rate:
+            movie_rate_average_result = await db.execute(
+                select(func.avg(RateMovieModel.rate)).where(RateMovieModel.movie_id == movie_id)
+            )
+            movie_rate_average = movie_rate_average_result.scalar()
+            return movie_rate_average
+        else:
+            rate_model.rate = rate_data.rate
+            await db.commit()
+            await db.refresh(rate_model)
+    else:
+        rate = RateMovieModel(
+            rate=rate_data.rate, movie_id=movie_id, user_id=current_user.id
+        )
+        db.add(rate)
+        await db.commit()
+        await db.refresh(rate)
+    movie_rate_average_result = await db.execute(
+        select(func.avg(RateMovieModel.rate)).where(RateMovieModel.movie_id == movie_id)
+    )
+    movie_rate_average = movie_rate_average_result.scalar()
+    return movie_rate_average
+
+

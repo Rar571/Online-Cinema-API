@@ -17,6 +17,7 @@ from crud.movies import (
     update_genre,
     delete_genre,
     detail_genre,
+    rate_movie,
 )
 from db.session_postgresql import get_db
 from dependencies.users import get_current_user_model
@@ -27,6 +28,7 @@ from schemas.movies import (
     MovieUpdateSchema,
     FavoriteMovieAddOrDeleteSchema,
     GenreSchema,
+    RateCreateSchema,
 )
 
 router = APIRouter()
@@ -172,3 +174,15 @@ async def genre_update(
 @router.delete("/genres/{genre_id}/", status_code=status.HTTP_200_OK)
 async def genre_delete(genre_id: int, db: AsyncSession = Depends(get_db)):
     return await delete_genre(genre_id=genre_id, db=db)
+
+
+@router.post("/movies/{movie_id}/rate/", status_code=status.HTTP_200_OK)
+async def movie_rate(
+    movie_id: int,
+    rate_data: RateCreateSchema,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user_model),
+):
+    return await rate_movie(
+        movie_id=movie_id, rate_data=rate_data, db=db, current_user=current_user
+    )

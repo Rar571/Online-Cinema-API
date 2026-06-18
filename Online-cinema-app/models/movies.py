@@ -3,6 +3,7 @@ from typing import List, Optional
 from decimal import Decimal
 
 from sqlalchemy import (
+    CheckConstraint,
     Enum,
     Integer,
     String,
@@ -173,3 +174,22 @@ class FavoriteMovieModel(MovieModel):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     user: Mapped[UserModel] = relationship(UserModel, back_populates="favorite_movies")
+
+
+class RateMovieModel(Base):
+    __tablename__ = "rates"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    rate: Mapped[int] = mapped_column(Integer, nullable=False)
+    movie_id: Mapped[int] = mapped_column(
+        ForeignKey("movies.id", ondelete="CASCADE"), nullable=False
+    )
+    movie: Mapped[MovieModel] = relationship(MovieModel, back_populates="rates")
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    user: Mapped[UserModel] = relationship(UserModel, back_populates="rates")
+
+    __table_args__ = CheckConstraint(
+        "rate > 0 AND rate < 11", name="range from 1 to 10"
+    )

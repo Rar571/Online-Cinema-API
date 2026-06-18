@@ -1,7 +1,7 @@
 from typing import Optional
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class CertificationSchema(BaseModel):
@@ -71,3 +71,8 @@ class GenreListSchema(GenreSchema):
     related_movies: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class RateCreateSchema(BaseModel):
+    rate: int = Field(ge=1, le=10)
+    movie_id: int
