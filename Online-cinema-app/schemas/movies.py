@@ -1,7 +1,7 @@
-from typing import Optional
+from typing import Optional, List
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class CertificationSchema(BaseModel):
@@ -29,8 +29,18 @@ class MovieListSchema(MovieSchema):
     model_config = ConfigDict(from_attributes=True)
 
 
-class MovieDetailSchema(MovieSchema):
+class MovieDetailSchema(BaseModel):
     id: int
+    uuid: str
+    name: str
+    year: int
+    time: int
+    imdb: float
+    votes: int
+    meta_score: Optional[float] = None
+    gross: Optional[float] = None
+    description: str
+    price: Decimal
     certification: CertificationSchema
 
     model_config = ConfigDict(from_attributes=True)
@@ -40,7 +50,7 @@ class MovieCreateSchema(MovieSchema):
     pass
 
 
-class MovieUpdateSchema(MovieSchema):
+class MovieUpdateSchema(BaseModel):
     uuid: Optional[str] = None
     name: Optional[str] = None
     year: Optional[int] = None
@@ -76,3 +86,39 @@ class GenreListSchema(GenreSchema):
 class RateCreateSchema(BaseModel):
     rate: int = Field(ge=1, le=10)
     movie_id: int
+
+
+class CommentSchema(BaseModel):
+    user_name: str
+
+
+class CommentsListSchema(CommentSchema):
+    text: str
+    replies_count: int
+
+
+class CommentCreateSchema(BaseModel):
+    text: str
+    movie_id: int
+
+
+class CommentReplyListSchema(CommentSchema):
+    text: str
+
+
+class CommentDetail(CommentSchema):
+    text: str
+    replies: List[CommentReplyListSchema]
+
+
+class CommentUpdateSchema(BaseModel):
+    text: str
+
+
+class CommentReplyCreateSchema(BaseModel):
+    text: str
+    comment_id: int
+
+
+class CommentReplyUpdateSchema(CommentUpdateSchema):
+    pass

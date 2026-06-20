@@ -1,4 +1,4 @@
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Response
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -12,6 +12,8 @@ from models.movies import (
     FavoriteMovieModel,
     GenreModel,
     RateMovieModel,
+    CommentMovieModel,
+    CommentRepliesModel,
 )
 from models.users import UserModel
 from schemas.movies import (
@@ -24,6 +26,11 @@ from schemas.movies import (
     GenreListSchema,
     GenreSchema,
     RateCreateSchema,
+    CommentsListSchema,
+    CommentCreateSchema,
+    CommentDetail,
+    CommentUpdateSchema,
+    CommentReplyListSchema, CommentReplyCreateSchema, CommentReplyUpdateSchema,
 )
 
 
@@ -119,7 +126,7 @@ async def movie_delete(movie_id: int, db: AsyncSession):
         )
     await db.delete(movie)
     await db.commit()
-    return await get_movies_list(db=db)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 async def like_or_dislike_movie(
@@ -258,10 +265,7 @@ async def delete_favorite_movie(
     if existing_favorite:
         await db.delete(existing_favorite)
         await db.commit()
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content={"detail": "Movie was removed from favorites"},
-        )
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     else:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found"
@@ -332,7 +336,7 @@ async def delete_genre(genre_id, db: AsyncSession):
         )
     await db.delete(genre)
     await db.commit()
-    return await get_genres_list(db=db)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 async def rate_movie(
@@ -351,7 +355,9 @@ async def rate_movie(
     if rate_model:
         if rate_model.rate == rate_data.rate:
             movie_rate_average_result = await db.execute(
-                select(func.avg(RateMovieModel.rate)).where(RateMovieModel.movie_id == movie_id)
+                select(func.avg(RateMovieModel.rate)).where(
+                    RateMovieModel.movie_id == movie_id
+                )
             )
             movie_rate_average = movie_rate_average_result.scalar()
             return movie_rate_average
@@ -373,3 +379,137 @@ async def rate_movie(
     return movie_rate_average
 
 
+async def list_comments(db: AsyncSession):
+    comments_result = await db.execute(
+        select(
+            CommentMovieModel.user_name,
+            CommentMovieModel.text,
+            func.count(CommentRepliesModel.id).label("replies_count"),
+        )
+        .outerjoin(
+            CommentRepliesModel, CommentRepliesModel.comment_id == CommentMovieModel.id
+        )
+        .group_by(CommentMovieModel.id,
+                  CommentMovieModel.user_name,
+                  CommentMovieModel.text)
+    )
+    comments = comments_result.scalars().all()
+    if not comments:
+        return []
+    comments_list = [
+        CommentsListSchema(
+            user_name=comment.user_name,
+            text=comment.text,
+            replies_count=comment.replies_count,
+        )
+        for comment in comments
+    ]
+    return comments_list
+
+
+async def create_comment(comment_data: CommentCreateSchema, db: AsyncSession):
+    comment = CommentMovieModel(**comment_data.model_dump())
+    db.add(comment)
+    await db.commit()
+    await db.refresh(comment)
+    comment_detail = CommentDetail.model_validate(comment, from_attributes=True)
+    return comment_detail
+
+
+async def comment_detail(comment_id: int, db: AsyncSession):
+    comment_result = await db.execute(
+        select(CommentMovieModel.user_name,
+               CommentMovieModel.text,
+               CommentMovieModel.replies)
+        .where(CommentMovieModel.id == comment_id)
+        .options(selectinload(CommentMovieModel.replies))
+    )
+    comment = comment_result.scalar_one_or_none()
+    if not comment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    if not comment.replies:
+        replies = []
+    else:
+        replies = [
+            CommentReplyListSchema(user_name=reply.user_name, text=reply.text)
+            for reply in comment.replies
+        ]
+    comment_detail = CommentDetail(
+        user_name=comment.user_name, text=comment.text, replies=replies
+    )
+    return comment_detail
+
+
+async def update_comment(
+    comment_id: int, comment_data: CommentUpdateSchema, db: AsyncSession
+):
+    comment_result = await db.execute(
+        select(CommentMovieModel)
+        .where(CommentMovieModel.id == comment_id)
+        .options(selectinload(CommentMovieModel.replies))
+    )
+    comment = comment_result.scalar_one_or_none()
+    if not comment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    replies = comment.replies
+    for field, value in comment_data.model_dump(exclude_unset=True).items():
+        setattr(comment, field, value)
+    await db.commit()
+    replies_schemas = [
+        CommentReplyListSchema(user_name=reply.user_name, text=reply.text) for reply in replies
+    ]
+    comment_detail = CommentDetail(user_name=comment.user_name, text=comment.text, replies=replies_schemas)
+    return comment_detail
+
+
+async def delete_comment(comment_id: int, db: AsyncSession):
+    comment_result = await db.execute(
+        select(CommentMovieModel).where(CommentMovieModel.id == comment_id)
+    )
+    comment = comment_result.scalar_one_or_none()
+    if not comment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
+        )
+    await db.delete(comment)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+async def create_reply(reply_data: CommentReplyCreateSchema, db: AsyncSession):
+    reply = CommentRepliesModel(**reply_data.model_dump())
+    db.add(reply)
+    await db.commit()
+    await db.refresh(reply)
+    reply_detail = CommentReplyListSchema.model_validate(reply, from_attributes=True)
+    return reply_detail
+
+
+async def update_reply(reply_data: CommentReplyUpdateSchema, reply_id: int, db: AsyncSession):
+    reply_result = await db.execute(select(CommentRepliesModel).where(
+        CommentRepliesModel.id == reply_id
+    ))
+    reply = reply_result.scalar_one_or_none()
+    if not reply:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reply to the comment not found")
+    for field, value in reply_data.model_dump(exclude_unset=True).items():
+        setattr(reply, field, value)
+    await db.commit()
+    reply_detail = CommentReplyListSchema.model_validate(reply, from_attributes=True)
+    return reply_detail
+
+
+async def delete_reply(reply_id: int, db: AsyncSession):
+    reply_result = await db.execute(select(CommentRepliesModel).where(
+        CommentRepliesModel.id == reply_id
+    ))
+    reply = reply_result.scalar_one_or_none()
+    if not reply:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reply to the comment not found")
+    await db.delete(reply)
+    await db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -193,3 +193,51 @@ class RateMovieModel(Base):
     __table_args__ = CheckConstraint(
         "rate > 0 AND rate < 11", name="range from 1 to 10"
     )
+
+
+class CommentMovieModel(Base):
+    __tablename__ = "comments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    movie_id: Mapped[int] = mapped_column(
+        ForeignKey("movies.id", ondelete="CASCADE"), nullable=False
+    )
+    movie: Mapped[MovieModel] = relationship(MovieModel, back_populates="comments")
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    user: Mapped[UserModel] = relationship(UserModel, back_populates="comments")
+
+    replies: Mapped[List["CommentRepliesModel"]] = relationship(
+        "CommentRepliesModel", back_populates="comments", cascade="all, delete-orphan"
+    )
+
+    @property
+    def user_name(self) -> str | None:
+        if not self.user.user_profile:
+            return None
+        return f"{self.user.user_profile.first_name} {self.user.user_profile.last_name}"
+
+
+class CommentRepliesModel(Base):
+    __tablename__ = "replies"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    comment_id: Mapped[int] = mapped_column(
+        ForeignKey("comments.id", ondelete="CASCADE"), nullable=False
+    )
+    comment: Mapped[CommentMovieModel] = relationship(
+        CommentMovieModel, back_populates="replies"
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    user: Mapped[UserModel] = relationship(UserModel, back_populates="replies")
+
+    @property
+    def user_name(self) -> str | None:
+        if not self.user.user_profile:
+            return ""
+        return f"{self.user.user_profile.first_name} {self.user.user_profile.last_name}"
