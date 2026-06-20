@@ -35,10 +35,10 @@ from security.token import generate_access_token, generate_refresh_token, decode
 from tasks.celery import send_email
 from datetime import datetime, timezone, timedelta
 
-router = APIRouter()
+users_router = APIRouter()
 
 
-@router.post("/register/", status_code=201)
+@users_router.post("/register/", status_code=201)
 async def register_user(
     user_data: UserRegistrationSchema, db: AsyncSession = Depends(get_db)
 ):
@@ -86,7 +86,7 @@ async def register_user(
         )
 
 
-@router.post("/activation_token/")
+@users_router.post("/activation_token/")
 async def get_new_activation_token(
     user_data: UserBaseSchema, db: AsyncSession = Depends(get_db)
 ):
@@ -129,7 +129,7 @@ async def get_new_activation_token(
     )
 
 
-@router.get("/activate/")
+@users_router.get("/activate/")
 async def activate_account(
     user_data: UserActivationSchema, db: AsyncSession = Depends(get_db)
 ):
@@ -159,7 +159,7 @@ async def activate_account(
     )
 
 
-@router.get("/login/")
+@users_router.get("/login/")
 async def user_login(user_data: UserLoginSchema, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_email(user_email=user_data.email, db=db)
     hashed_password = user.hashed_password
@@ -189,7 +189,7 @@ async def user_login(user_data: UserLoginSchema, db: AsyncSession = Depends(get_
     )
 
 
-@router.post("/logout/")
+@users_router.post("/logout/")
 async def user_logout(request: Request, db: AsyncSession = Depends(get_db)):
     headers = request.headers.get("Authorization")
     if not headers:
@@ -222,7 +222,7 @@ async def user_logout(request: Request, db: AsyncSession = Depends(get_db)):
     )
 
 
-@router.post("/change-password/")
+@users_router.post("/change-password/")
 async def change_user_password(
     request: Request,
     user_data: UserChangePasswordSchema,
@@ -262,7 +262,7 @@ async def change_user_password(
     )
 
 
-@router.post("/reset-password-request/")
+@users_router.post("/reset-password-request/")
 async def reset_user_password_request(
     user_data: UserResetPasswordRequestSchema, db: AsyncSession = Depends(get_db)
 ):
@@ -305,7 +305,7 @@ async def reset_user_password_request(
     )
 
 
-@router.post("/reset-password-complete/")
+@users_router.post("/reset-password-complete/")
 async def reset_user_password_complete(
     user_data: UserResetPasswordCompleteSchema, db: AsyncSession = Depends(get_db)
 ):
@@ -335,7 +335,7 @@ async def reset_user_password_complete(
     )
 
 
-@router.post("/refresh-access-token/")
+@users_router.post("/refresh-access-token/")
 async def refresh_user_access_token(
     user_data: UserRefreshAccessTokenSchema, db: AsyncSession = Depends(get_db)
 ):
@@ -373,7 +373,7 @@ async def refresh_user_access_token(
     )
 
 
-@router.post("/{user_id}/make-admin/")
+@users_router.post("/{user_id}/make-admin/")
 async def make_admin(
     user_id: int,
     current_user=Depends(require_admin),
@@ -397,7 +397,7 @@ async def make_admin(
     )
 
 
-@router.post("/{user_id}/make-moderator/")
+@users_router.post("/{user_id}/make-moderator/")
 async def make_moderator(
     user_id: int,
     current_user=Depends(require_admin),
@@ -422,7 +422,7 @@ async def make_moderator(
     )
 
 
-@router.post("/{user_id}/make-user/")
+@users_router.post("/{user_id}/make-user/")
 async def make_user(
     user_id: int,
     current_user=Depends(require_admin),
@@ -447,7 +447,7 @@ async def make_user(
     )
 
 
-@router.post("/{user_id}/activate_user/")
+@users_router.post("/{user_id}/activate_user/")
 async def activate_user_by_id(
     user_id: int,
     current_user=Depends(require_admin),

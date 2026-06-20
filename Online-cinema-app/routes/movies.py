@@ -31,10 +31,10 @@ from schemas.movies import (
     RateCreateSchema, CommentCreateSchema, CommentUpdateSchema, CommentReplyCreateSchema, CommentReplyUpdateSchema,
 )
 
-router = APIRouter()
+movies_router = APIRouter()
 
 
-@router.get("/movies/", status_code=status.HTTP_200_OK)
+@movies_router.get("/movies/", status_code=status.HTTP_200_OK)
 async def movies_list(
     name: str | None = None,
     description: str | None = None,
@@ -63,31 +63,31 @@ async def movies_list(
     )
 
 
-@router.post("/movies/", status_code=status.HTTP_201_CREATED)
+@movies_router.post("/movies/", status_code=status.HTTP_201_CREATED)
 async def movie_create(
     movie_data: MovieCreateSchema, db: AsyncSession = Depends(get_db)
 ):
     return await create_movie(movie_data=movie_data, db=db)
 
 
-@router.get("/movies/{movie_id}/", status_code=status.HTTP_200_OK)
+@movies_router.get("/movies/{movie_id}/", status_code=status.HTTP_200_OK)
 async def movie_details(movie_id: int, db: AsyncSession = Depends(get_db)):
     return await movie_detail(movie_id=movie_id, db=db)
 
 
-@router.patch("/movies/{movie_id}/", status_code=status.HTTP_200_OK)
+@movies_router.patch("/movies/{movie_id}/", status_code=status.HTTP_200_OK)
 async def update_movie(
     movie_id: int, movie_data: MovieUpdateSchema, db: AsyncSession = Depends(get_db)
 ):
     return await movie_update(movie_id=movie_id, movie_data=movie_data, db=db)
 
 
-@router.delete("/movies/{movie_id}/", status_code=status.HTTP_204_NO_CONTENT)
+@movies_router.delete("/movies/{movie_id}/", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_movie(movie_id, db: AsyncSession = Depends(get_db)):
     return await movie_delete(movie_id=movie_id, db=db)
 
 
-@router.post("/movies/{movie_id}/like/", status_code=status.HTTP_200_OK)
+@movies_router.post("/movies/{movie_id}/like/", status_code=status.HTTP_200_OK)
 async def like_and_dislike(
     movie_id: int,
     like_type: LikeTypeEnum,
@@ -99,7 +99,7 @@ async def like_and_dislike(
     )
 
 
-@router.get("/movies/favorites/", status_code=status.HTTP_200_OK)
+@movies_router.get("/movies/favorites/", status_code=status.HTTP_200_OK)
 async def favorite_movies_list(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
@@ -107,7 +107,7 @@ async def favorite_movies_list(
     return await favorite_movies_list(db=db, current_user=current_user)
 
 
-@router.post("/movies/favorites/", status_code=status.HTTP_201_CREATED)
+@movies_router.post("/movies/favorites/", status_code=status.HTTP_201_CREATED)
 async def add_favorite_movie(
     movie_data: FavoriteMovieAddOrDeleteSchema,
     db: AsyncSession = Depends(get_db),
@@ -118,7 +118,7 @@ async def add_favorite_movie(
     )
 
 
-@router.delete("/movies/favorites/", status_code=status.HTTP_200_OK)
+@movies_router.delete("/movies/favorites/", status_code=status.HTTP_200_OK)
 async def delete_favorite_movie(
     movie_data: FavoriteMovieAddOrDeleteSchema,
     db: AsyncSession = Depends(get_db),
@@ -129,22 +129,22 @@ async def delete_favorite_movie(
     )
 
 
-@router.get("/genres/", status_code=status.HTTP_200_OK)
+@movies_router.get("/genres/", status_code=status.HTTP_200_OK)
 async def genres_list(db: AsyncSession = Depends(get_db)):
     return await get_genres_list(db=db)
 
 
-@router.post("/genres/", status_code=status.HTTP_201_CREATED)
+@movies_router.post("/genres/", status_code=status.HTTP_201_CREATED)
 async def genre_create(genre_data: GenreSchema, db: AsyncSession = Depends(get_db)):
     return await create_genre(genre_data=genre_data, db=db)
 
 
-@router.get("/genres/{genre_id}/", status_code=status.HTTP_200_OK)
+@movies_router.get("/genres/{genre_id}/", status_code=status.HTTP_200_OK)
 async def genre_detail(genre_id: int, db: AsyncSession = Depends(get_db)):
     return await detail_genre(genre_id=genre_id, db=db)
 
 
-@router.get("/genres/{genre_id}/movies/", status_code=status.HTTP_200_OK)
+@movies_router.get("/genres/{genre_id}/movies/", status_code=status.HTTP_200_OK)
 async def get_related_movies(genre_id: int, db: AsyncSession = Depends(get_db)):
     genre_result = await db.execute(select(GenreModel).where(GenreModel.id == genre_id))
     genre = genre_result.scalar_one_or_none()
@@ -164,19 +164,19 @@ async def get_related_movies(genre_id: int, db: AsyncSession = Depends(get_db)):
     return movies
 
 
-@router.patch("/genres/{genre_id}/", status_code=status.HTTP_200_OK)
+@movies_router.patch("/genres/{genre_id}/", status_code=status.HTTP_200_OK)
 async def genre_update(
     genre_id: int, genre_data: GenreSchema, db: AsyncSession = Depends(get_db)
 ):
     return await update_genre(genre_id=genre_id, genre_data=genre_data, db=db)
 
 
-@router.delete("/genres/{genre_id}/", status_code=status.HTTP_204_NO_CONTENT)
+@movies_router.delete("/genres/{genre_id}/", status_code=status.HTTP_204_NO_CONTENT)
 async def genre_delete(genre_id: int, db: AsyncSession = Depends(get_db)):
     return await delete_genre(genre_id=genre_id, db=db)
 
 
-@router.post("/movies/{movie_id}/rate/", status_code=status.HTTP_200_OK)
+@movies_router.post("/movies/{movie_id}/rate/", status_code=status.HTTP_200_OK)
 async def movie_rate(
     movie_id: int,
     rate_data: RateCreateSchema,
@@ -188,41 +188,41 @@ async def movie_rate(
     )
 
 
-@router.get("/comments/", status_code=status.HTTP_200_OK)
+@movies_router.get("/comments/", status_code=status.HTTP_200_OK)
 async def comments_list(db: AsyncSession = Depends(get_db)):
     return await list_comments(db=db)
 
 
-@router.post("/comments/", status_code=status.HTTP_201_CREATED)
+@movies_router.post("/comments/", status_code=status.HTTP_201_CREATED)
 async def comment_create(comment_data: CommentCreateSchema, db: AsyncSession = Depends(get_db)):
     return await create_comment(comment_data=comment_data, db=db)
 
 
-@router.get("/comments/{comment_id}/", status_code=status.HTTP_200_OK)
+@movies_router.get("/comments/{comment_id}/", status_code=status.HTTP_200_OK)
 async def detail_comment(comment_id: int, db: AsyncSession = Depends(get_db)):
     return await comment_detail(comment_id=comment_id, db=db)
 
 
-@router.patch("/comments/{comment_id}/", status_code=status.HTTP_200_OK)
+@movies_router.patch("/comments/{comment_id}/", status_code=status.HTTP_200_OK)
 async def comment_update(comment_id: int, comment_data: CommentUpdateSchema, db: AsyncSession = Depends(get_db)):
     return await update_comment(comment_id=comment_id, comment_data=comment_data, db=db)
 
 
-@router.delete("/comments/{comment_id}/", status_code=status.HTTP_204_NO_CONTENT)
+@movies_router.delete("/comments/{comment_id}/", status_code=status.HTTP_204_NO_CONTENT)
 async def comment_delete(comment_id: int, db: AsyncSession = Depends(get_db)):
     return await delete_comment(comment_id=comment_id, db=db)
 
 
-@router.post("/comments/replies/", status_code=status.HTTP_201_CREATED)
+@movies_router.post("/comments/replies/", status_code=status.HTTP_201_CREATED)
 async def comment_reply_create(reply_data: CommentReplyCreateSchema, db: AsyncSession = Depends(get_db)):
     return await create_reply(reply_data=reply_data, db=db)
 
 
-@router.patch("/comments/replies/{reply_id}/", status_code=status.HTTP_200_OK)
+@movies_router.patch("/comments/replies/{reply_id}/", status_code=status.HTTP_200_OK)
 async def comment_reply_update(reply_data: CommentReplyUpdateSchema, reply_id: int, db: AsyncSession = Depends(get_db)):
     return await update_reply(reply_data=reply_data, reply_id=reply_id, db=db)
 
 
-@router.delete("/comments/replies/{reply_id}/", status_code=status.HTTP_204_NO_CONTENT)
+@movies_router.delete("/comments/replies/{reply_id}/", status_code=status.HTTP_204_NO_CONTENT)
 async def comment_reply_delete(reply_id: int, db: AsyncSession = Depends(get_db)):
     return await delete_reply(reply_id=reply_id, db=db)
