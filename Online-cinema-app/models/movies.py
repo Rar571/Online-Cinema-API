@@ -133,6 +133,18 @@ class MovieModel(Base):
     stars: Mapped[List[StarModel]] = relationship(
         StarModel, secondary=movie_stars, back_populates="movies"
     )
+    movie_likes_and_dislikes: Mapped[List["LikeAndDislikeModel"]] = relationship(
+        "LikeAndDislikeModel", back_populates="movie", cascade="all, delete-orphan"
+    )
+    movie_favorite_movies: Mapped[List["FavoriteMovieModel"]] = relationship(
+        "FavoriteMovieModel", back_populates="movie", cascade="all, delete-orphan"
+    )
+    movie_rates: Mapped[List["RateMovieModel"]] = relationship(
+        "RateMovieModel", back_populates="movie", cascade="all, delete-orphan"
+    )
+    movie_comments: Mapped[List["CommentMovieModel"]] = relationship(
+        "CommentMovieModel", back_populates="movie", cascade="all, delete-orphan"
+    )
 
     __table_args__ = UniqueConstraint("name", "year", "time", name="unique_movie")
 
@@ -168,12 +180,14 @@ class FavoriteMovieModel(MovieModel):
         ForeignKey("movies.id", ondelete="CASCADE"), nullable=False
     )
     movie: Mapped[MovieModel] = relationship(
-        MovieModel, back_populates="favorite_movies"
+        MovieModel, back_populates="movie_favorite_movies"
     )
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    user: Mapped[UserModel] = relationship(UserModel, back_populates="favorite_movies")
+    user: Mapped[UserModel] = relationship(
+        UserModel, back_populates="user_favorite_movies"
+    )
 
 
 class RateMovieModel(Base):
@@ -184,11 +198,11 @@ class RateMovieModel(Base):
     movie_id: Mapped[int] = mapped_column(
         ForeignKey("movies.id", ondelete="CASCADE"), nullable=False
     )
-    movie: Mapped[MovieModel] = relationship(MovieModel, back_populates="rates")
+    movie: Mapped[MovieModel] = relationship(MovieModel, back_populates="movie_rates")
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    user: Mapped[UserModel] = relationship(UserModel, back_populates="rates")
+    user: Mapped[UserModel] = relationship(UserModel, back_populates="user_rates")
 
     __table_args__ = CheckConstraint(
         "rate > 0 AND rate < 11", name="range from 1 to 10"
@@ -203,14 +217,16 @@ class CommentMovieModel(Base):
     movie_id: Mapped[int] = mapped_column(
         ForeignKey("movies.id", ondelete="CASCADE"), nullable=False
     )
-    movie: Mapped[MovieModel] = relationship(MovieModel, back_populates="comments")
+    movie: Mapped[MovieModel] = relationship(
+        MovieModel, back_populates="movie_comments"
+    )
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    user: Mapped[UserModel] = relationship(UserModel, back_populates="comments")
+    user: Mapped[UserModel] = relationship(UserModel, back_populates="user_comments")
 
     replies: Mapped[List["CommentRepliesModel"]] = relationship(
-        "CommentRepliesModel", back_populates="comments", cascade="all, delete-orphan"
+        "CommentRepliesModel", back_populates="comment", cascade="all, delete-orphan"
     )
 
     @property
@@ -234,7 +250,7 @@ class CommentRepliesModel(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    user: Mapped[UserModel] = relationship(UserModel, back_populates="replies")
+    user: Mapped[UserModel] = relationship(UserModel, back_populates="user_replies")
 
     @property
     def user_name(self) -> str | None:
