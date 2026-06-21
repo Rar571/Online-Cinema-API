@@ -83,6 +83,29 @@ class GenreListSchema(GenreSchema):
     model_config = ConfigDict(from_attributes=True)
 
 
+class StarSchema(BaseModel):
+    name: str
+
+
+class StarListSchema(StarSchema):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StarCreateSchema(StarSchema):
+    pass
+
+
+class StarDetailSchema(StarSchema):
+    id: int
+    related_movies: List[str]
+
+
+class StarUpdateSchema(StarSchema):
+    pass
+
+
 class RateCreateSchema(BaseModel):
     rate: int = Field(ge=1, le=10)
     movie_id: int
