@@ -18,6 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.session_postgresql import Base
+from models.shopping_cart import CartItemModel
 from models.users import UserModel
 
 movie_genres = Table(
@@ -144,6 +145,9 @@ class MovieModel(Base):
     )
     movie_comments: Mapped[List["CommentMovieModel"]] = relationship(
         "CommentMovieModel", back_populates="movie", cascade="all, delete-orphan"
+    )
+    cart_items: Mapped[List["CartItemModel"]] = relationship(
+        "CartItemModel", back_populates="movie"
     )
 
     __table_args__ = UniqueConstraint("name", "year", "time", name="unique_movie")

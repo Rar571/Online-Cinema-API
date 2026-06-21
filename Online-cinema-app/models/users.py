@@ -23,6 +23,7 @@ from models.movies import (
     CommentMovieModel,
     CommentRepliesModel,
 )
+from models.shopping_cart import CartModel
 from security.token import generate_token
 
 
@@ -98,6 +99,9 @@ class UserModel(Base):
     )
     user_replies: Mapped[List[CommentRepliesModel]] = relationship(
         CommentRepliesModel, back_populates="user", cascade="all, delete-orphan"
+    )
+    cart: Mapped[Optional["CartModel"]] = relationship(
+        "CartModel", back_populates="user", uselist=False
     )
 
 
