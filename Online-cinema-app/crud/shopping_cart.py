@@ -149,3 +149,93 @@ async def clear_cart(db: AsyncSession, current_user: UserModel):
     return JSONResponse(
         status_code=status.HTTP_200_OK, content={"detail": "Cart is cleared"}
     )
+
+
+
+async def pay_for_cart(db: AsyncSession, current_user: UserModel):
+    if not current_user or current_user.is_active is False:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please register on the website first before purchasing the movies",
+        )
+    cart_result = await db.execute(
+        select(CartModel)
+        .where(CartModel.user_id == current_user.id)
+        .options(selectinload(CartModel.cart_items))
+    )
+    cart = cart_result.one_or_none()
+    if not cart:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cart not found"
+        )
+    cart_items_id = [cart_item.movie_id for cart_item in cart.cart_items]
+    purchased_movies_result = await db.execute(
+        select(OrderModel).where(
+            OrderModel.user_id == current_user.id,
+            OrderModel.status == OrderStatusEnum.PAID,
+            OrderModel.order_items.any(OrderItemModel.movie_id.in_(cart_items_id)),
+        )
+    )
+    purchased_movies = purchased_movies_result.scalars().all()
+    if purchased_movies:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You have already bought these movies",
+        )
+    order = OrderModel(user_id=current_user.id, status=OrderStatusEnum.PENDING)
+    db.add(order)
+    await db.flush()
+    cart_items_result = await db.execute(
+        select(CartItemModel)
+        .where(CartItemModel.cart_id == cart.id)
+        .options(selectinload(CartItemModel.movie))
+    )
+    cart_items = cart_items_result.scalars().all()
+    order_items = [
+        OrderItemModel(
+            order_id=order.id,
+            movie_id=cart_item.movie_id,
+            price_at_order=cart_item.movie.price,
+        )
+        for cart_item in cart_items
+    ]
+    total_amount = Decimal("0")
+    for order_item in order_items:
+        db.add(order_item)
+        total_amount += order_item.price_at_order
+    order.order_items = order_items
+    order.total_amount = total_amount
+    await db.commit()
+    return await create_checkout_session(
+        order_id=order.id, db=db, current_user=current_user
+    )
+
+
+async def view_user_cart(user_id: int, db: AsyncSession, current_user: UserModel):
+    cart_result = await db.execute(
+        select(CartModel).where(CartModel.user_id == user_id)
+    )
+    cart = cart_result.scalar_one_or_none()
+    if not cart:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Cart not found"
+        )
+    cart_items_result = await db.execute(
+        select(CartItemModel)
+        .where(CartItemModel.cart_id == cart.id)
+        .options(selectinload(CartItemModel.movie).selectinload(MovieModel.genres))
+    )
+    cart_items = cart_items_result.scalars().all()
+    if not cart_items:
+        return []
+    movies = [
+        CartItemSchema(
+            name=cart_item.movie.name,
+            price=cart_item.movie.price,
+            genre=cart_item.movie.genre,
+            release_year=cart_item.movie.release_year,
+            added_at=cart_item.added_at,
+        )
+        for cart_item in cart_items
+    ]
+    return movies
