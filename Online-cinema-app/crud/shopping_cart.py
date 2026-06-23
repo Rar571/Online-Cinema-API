@@ -3,11 +3,15 @@ from fastapi import HTTPException, status, Response
 from fastapi.responses import JSONResponse
 
 from sqlalchemy import select, delete
+from sqlalchemy.orm import selectinload
 
+from crud.payments import create_checkout_session
 from models.movies import MovieModel
+from models.orders import OrderModel, OrderStatusEnum, OrderItemModel
 from models.shopping_cart import CartModel, CartItemModel
 from models.users import UserModel
 from schemas.shopping_cart import CartItemSchema, CartAddSchema
+from decimal import Decimal
 
 
 async def cart_movies_list(db: AsyncSession, current_user: UserModel):
@@ -40,6 +44,32 @@ async def cart_movies_list(db: AsyncSession, current_user: UserModel):
 async def add_movie_to_cart(
     movie_data: CartAddSchema, db: AsyncSession, current_user: UserModel
 ):
+    order_result = await db.execute(
+        select(OrderModel).where(
+            OrderModel.user_id == current_user.id,
+            OrderModel.status == OrderStatusEnum.PAID,
+            OrderModel.order_items.any(OrderItemModel.movie_id == movie_data.movie_id),
+        )
+    )
+    order = order_result.one_or_none()
+    if order:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You can not buy movie twice",
+        )
+    existing_movie_result = await db.execute(
+        select(CartModel).where(
+            CartModel.user_id == current_user.id,
+            CartModel.cart_items.any(CartItemModel.movie_id == movie_data.movie_id),
+        )
+    )
+    existing_movie = existing_movie_result.one_or_none()
+    if existing_movie:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This movie is already in your cart",
+        )
+
     cart_result = await db.execute(
         select(CartModel).where(CartModel.user_id == current_user.id)
     )
