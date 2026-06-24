@@ -190,6 +190,9 @@ async def pay_for_cart(db: AsyncSession, current_user: UserModel):
         .options(selectinload(CartItemModel.movie))
     )
     cart_items = cart_items_result.scalars().all()
+    deleted_movies_id = [
+        cart_item.movie_id for cart_item in cart_items if not cart_item.movie
+    ]
     order_items = [
         OrderItemModel(
             order_id=order.id,
@@ -197,7 +200,30 @@ async def pay_for_cart(db: AsyncSession, current_user: UserModel):
             price_at_order=cart_item.movie.price,
         )
         for cart_item in cart_items
+        if cart_item.movie
     ]
+    if not order_items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="All movies from your cart are unavailable to buy",
+        )
+    movies_id = [order_item.movie_id for order_item in order_items]
+    existing_order = await db.execute(
+        select(OrderModel)
+        .join(OrderItemModel)
+        .where(
+            OrderModel.user_id == current_user.id,
+            OrderModel.status == OrderStatusEnum.PENDING,
+            OrderItemModel.movie_id.in_(movies_id),
+        )
+    )
+    existing_order = existing_order.scalar_one_or_none()
+    if existing_order:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You already have created this pending order",
+        )
     total_amount = Decimal("0")
     for order_item in order_items:
         db.add(order_item)
@@ -205,8 +231,24 @@ async def pay_for_cart(db: AsyncSession, current_user: UserModel):
     order.order_items = order_items
     order.total_amount = total_amount
     await db.commit()
-    return await create_checkout_session(
+    result = await create_checkout_session(
         order_id=order.id, db=db, current_user=current_user
+    )
+    if deleted_movies_id:
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED,
+            content={
+                "detail": f"Movie(s) with id: ({deleted_movies_id}) "
+                f"were excluded from your order, "
+                f"but order created successfully, "
+                f"url address for payment: {result}"
+            },
+        )
+    return JSONResponse(
+        status_code=status.HTTP_201_CREATED,
+        content={
+            "detail": f"Order was created successfully, url address for payment: {result}"
+        },
     )
 
 
