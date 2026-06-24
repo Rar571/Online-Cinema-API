@@ -132,15 +132,20 @@ async def movie_delete(movie_id: int, db: AsyncSession):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found"
         )
-    purchased_movie = await db.execute(select(OrderModel).where(
-        OrderModel.order_items.any(OrderItemModel.movie_id == movie.id)
-    ))
+    purchased_movie = await db.execute(
+        select(OrderModel).where(
+            OrderModel.order_items.any(OrderItemModel.movie_id == movie.id)
+        )
+    )
     purchased_movie = purchased_movie.scalar_one_or_none()
     if purchased_movie:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="This movie is already purchased")
-    movies_in_cart = await db.execute(select(CartItemModel).where(
-        CartItemModel.movie_id == movie.id
-    ))
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This movie is already purchased",
+        )
+    movies_in_cart = await db.execute(
+        select(CartItemModel).where(CartItemModel.movie_id == movie.id)
+    )
     movies_in_cart = movies_in_cart.scalars()
     carts_id = [cart_item.cart_id for cart_item in movies_in_cart]
     if carts_id:

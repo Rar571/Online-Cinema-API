@@ -151,7 +151,6 @@ async def clear_cart(db: AsyncSession, current_user: UserModel):
     )
 
 
-
 async def pay_for_cart(db: AsyncSession, current_user: UserModel):
     if not current_user or current_user.is_active is False:
         raise HTTPException(
