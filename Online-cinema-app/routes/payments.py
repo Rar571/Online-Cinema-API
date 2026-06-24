@@ -10,7 +10,11 @@ from schemas.payments import CheckoutSessionResponse
 payment_router = APIRouter()
 
 
-@payment_router.post("/payments/{order_id}/pay/", status_code=status.HTTP_201_CREATED, response_model=CheckoutSessionResponse)
+@payment_router.post(
+    "/payments/{order_id}/pay/",
+    status_code=status.HTTP_201_CREATED,
+    response_model=CheckoutSessionResponse,
+)
 async def pay_for_order(
     order_id: int,
     db: AsyncSession = Depends(get_db),
@@ -22,5 +26,9 @@ async def pay_for_order(
 
 
 @payment_router.post("/webhook/")
-async def webhook(request: Request, db: AsyncSession = Depends(get_db)):
-    return await stripe_webhook(request=request, db=db)
+async def webhook(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user_model),
+):
+    return await stripe_webhook(request=request, db=db, current_user=current_user)

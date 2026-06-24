@@ -8,6 +8,8 @@ from sqlalchemy import select
 import os
 from fastapi import Request, HTTPException, status
 
+from tasks.celery import send_email
+
 
 async def create_checkout_session(
     order_id: int, db: AsyncSession, current_user: UserModel
@@ -45,7 +47,7 @@ async def create_checkout_session(
     return {"checkout_url": session.url}
 
 
-async def stripe_webhook(request: Request, db: AsyncSession):
+async def stripe_webhook(request: Request, db: AsyncSession, current_user: UserModel):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
@@ -84,5 +86,9 @@ async def stripe_webhook(request: Request, db: AsyncSession):
             )
             db.add(payment_item)
         await db.commit()
-
+        send_email.delay(
+            subject="Payment is successful",
+            body=f"Payment is successful for order with id: {order.id}",
+            receiver_email=current_user.email,
+        )
     return {"status": "success"}
