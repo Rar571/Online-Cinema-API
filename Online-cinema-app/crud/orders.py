@@ -11,6 +11,8 @@ from fastapi import status, HTTPException
 
 from schemas.orders import OrderListSchema, Movie
 from tasks.celery import send_email
+from datetime import datetime
+from decimal import Decimal
 
 
 async def view_orders_list(db: AsyncSession, current_user: UserModel):
@@ -114,3 +116,49 @@ async def refund_request(order_id: int, db: AsyncSession, current_user: UserMode
         receiver_email=current_user.email,
     )
     return refund
+
+
+async def view_users_orders(
+    db: AsyncSession,
+    current_user: UserModel,
+    user_id: list[int] | None = None,
+    dates: list[datetime] | None = None,
+    statuses: list[OrderStatusEnum] | None = None,
+):
+    orders = select(OrderModel).options(selectinload(OrderModel.order_items).selectinload(OrderItemModel.movie))
+    if user_id:
+        orders = orders.filter(OrderModel.user_id.in_(user_id))
+    if dates:
+        orders = orders.filter(OrderModel.created_at.in_(dates))
+    if statuses:
+        orders = orders.filter(OrderModel.status.in_(statuses))
+    orders = await db.execute(orders)
+    orders = orders.scalars().all()
+    if not orders:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="There are no orders yet"
+        )
+    orders_list = []
+    for order in orders:
+        movie_schemas = [
+            Movie(
+                name=order_item.movie.name,
+                year=order_item.movie.year,
+                price_at_order=order_item.price_at_order,
+            )
+            for order_item in order.order_items
+            if order_item.movie
+        ]
+        total_amount = Decimal("0")
+        total_amount += sum(
+            [order_item.price_at_order for order_item
+             in order.order_items if order_item.movie]
+        )
+        order_schema = OrderListSchema(
+            created_at=order.created_at,
+            movies=movie_schemas,
+            total_amount=total_amount,
+            status=order.status,
+        )
+        orders_list.append(order_schema)
+    return orders_list
