@@ -1,5 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 import stripe
+from sqlalchemy.orm import selectinload
+from stripe._util import logger
 
 from models.orders import OrderModel, OrderStatusEnum
 from models.payments import PaymentModel, StatusEnum, PaymentItemModel
@@ -48,7 +50,7 @@ async def create_checkout_session(
     return {"checkout_url": session.url}
 
 
-async def stripe_webhook(request: Request, db: AsyncSession, current_user: UserModel):
+async def stripe_webhook(request: Request, db: AsyncSession):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
 
@@ -60,13 +62,14 @@ async def stripe_webhook(request: Request, db: AsyncSession, current_user: UserM
         session = event["data"]["object"]
         order_id = session["metadata"]["order_id"]
         order_result = await db.execute(
-            select(OrderModel).where(OrderModel.id == order_id)
+            select(OrderModel).where(OrderModel.id == order_id).options(
+                selectinload(OrderModel.user),
+                selectinload(OrderModel.order_items))
         )
         order = order_result.one_or_none()
         if not order:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
-            )
+            logger.error(f"Order not found: {order_id}")
+            return {"status": "received"}
         order.status = OrderStatusEnum.PAID
         db.add(order)
         await db.flush()
@@ -90,8 +93,34 @@ async def stripe_webhook(request: Request, db: AsyncSession, current_user: UserM
         send_email.delay(
             subject="Payment is successful",
             body=f"Payment is successful for order with id: {order.id}",
-            receiver_email=current_user.email,
+            receiver_email=order.user.email,
         )
+    elif event["type"] == "payment_intent.payment_failed":
+        session = event["data"]["object"]
+        order_id = session.get("metadata", {}).get("order_id")
+        order_result = await db.execute(
+            select(OrderModel).where(OrderModel.id == order_id)
+        )
+        order = order_result.one_or_none()
+        if not order:
+            logger.error(f"Order not found: {order_id}")
+            return {"status": "received"}
+        order.status = OrderStatusEnum.CANCELED
+        await db.commit()
+        return {"status": "received"}
+    elif event["type"] == "checkout.session.expired":
+        session = event["data"]["object"]
+        order_id = session.get("metadata", {}).get("order_id")
+        order_result = await db.execute(
+            select(OrderModel).where(OrderModel.id == order_id)
+        )
+        order = order_result.one_or_none()
+        if not order:
+            logger.error(f"Order not found: {order_id}")
+            return {"status": "received"}
+        order.status = OrderStatusEnum.CANCELED
+        await db.commit()
+        return {"status": "received"}
     return {"status": "success"}
 
 
