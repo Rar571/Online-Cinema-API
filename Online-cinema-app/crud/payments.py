@@ -8,6 +8,7 @@ from sqlalchemy import select
 import os
 from fastapi import Request, HTTPException, status
 
+from schemas.payments import PaymentListSchema
 from tasks.celery import send_email
 
 
@@ -92,3 +93,23 @@ async def stripe_webhook(request: Request, db: AsyncSession, current_user: UserM
             receiver_email=current_user.email,
         )
     return {"status": "success"}
+
+
+async def user_payment_history(db: AsyncSession, current_user: UserModel):
+    payments = await db.execute(
+        select(PaymentModel).where(PaymentModel.user_id == current_user.id)
+    )
+    payments = payments.scalars().all()
+    if not payments:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="There are no payments yet"
+        )
+    payment_schemas = [
+        PaymentListSchema(
+            date_and_time=payment.created_at,
+            amount=payment.amount,
+            status=payment.status,
+        )
+        for payment in payments
+    ]
+    return payment_schemas
