@@ -224,10 +224,14 @@ async def pay_for_cart(db: AsyncSession, current_user: UserModel):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You already have created this pending order",
         )
+    current_movies_result = await db.execute(select(MovieModel).where(MovieModel.id.in_(movies_id)))
+    current_movies = current_movies_result.scalars().all()
     total_amount = Decimal("0")
+    movies_dict = {movie.id: movie.price for movie in current_movies}
     for order_item in order_items:
+        order_item.price_at_order = movies_dict.get(order_item.movie_id)
         db.add(order_item)
-        total_amount += order_item.price_at_order
+        total_amount += movies_dict.get(order_item.movie_id)
     order.order_items = order_items
     order.total_amount = total_amount
     await db.commit()
