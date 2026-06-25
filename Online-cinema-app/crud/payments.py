@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 import stripe
 from sqlalchemy.orm import selectinload
-from stripe._util import logger
+from loguru import logger
 
 from models.orders import OrderModel, OrderStatusEnum
 from models.payments import PaymentModel, StatusEnum, PaymentItemModel
@@ -12,6 +12,7 @@ from fastapi import Request, HTTPException, status
 
 from schemas.payments import PaymentListSchema
 from tasks.celery import send_email
+from datetime import datetime
 
 
 async def create_checkout_session(
@@ -151,3 +152,22 @@ async def user_payment_history(db: AsyncSession, current_user: UserModel):
         for payment in payments
     ]
     return payment_schemas
+
+
+async def view_all_payment_history(
+    db: AsyncSession,
+    current_user: UserModel,
+    users_id: list[int] | None = None,
+    dates: list[datetime] | None = None,
+    statuses: list[StatusEnum] | None = None,
+):
+    payments = select(PaymentModel)
+    if users_id:
+        payments = payments.filter(PaymentModel.user_id.in_(users_id))
+    if dates:
+        payments = payments.filter(PaymentModel.created_at.in_(dates))
+    if statuses:
+        payments = payments.filter(PaymentModel.status.in_(statuses))
+    payments = await db.execute(payments)
+    payments = payments.scalars().all()
+    return payments
