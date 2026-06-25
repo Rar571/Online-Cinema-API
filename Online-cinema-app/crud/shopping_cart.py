@@ -152,10 +152,10 @@ async def clear_cart(db: AsyncSession, current_user: UserModel):
 
 
 async def pay_for_cart(db: AsyncSession, current_user: UserModel):
-    if not current_user or current_user.is_active is False:
+    if not current_user.is_active:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please register on the website first before purchasing the movies",
+            detail="Please activate account on the website first before purchasing the movies",
         )
     cart_result = await db.execute(
         select(CartModel)
