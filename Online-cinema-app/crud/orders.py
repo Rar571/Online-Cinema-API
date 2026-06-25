@@ -121,13 +121,16 @@ async def refund_request(order_id: int, db: AsyncSession, current_user: UserMode
 async def view_users_orders(
     db: AsyncSession,
     current_user: UserModel,
-    user_id: list[int] | None = None,
+    users_id: list[int] | None = None,
     dates: list[datetime] | None = None,
     statuses: list[OrderStatusEnum] | None = None,
 ):
-    orders = select(OrderModel).options(selectinload(OrderModel.order_items).selectinload(OrderItemModel.movie))
-    if user_id:
-        orders = orders.filter(OrderModel.user_id.in_(user_id))
+    orders = select(OrderModel).options(
+        selectinload(OrderModel.order_items).
+        selectinload(OrderItemModel.movie)
+    )
+    if users_id:
+        orders = orders.filter(OrderModel.user_id.in_(users_id))
     if dates:
         orders = orders.filter(OrderModel.created_at.in_(dates))
     if statuses:
@@ -151,8 +154,11 @@ async def view_users_orders(
         ]
         total_amount = Decimal("0")
         total_amount += sum(
-            [order_item.price_at_order for order_item
-             in order.order_items if order_item.movie]
+            [
+                order_item.price_at_order
+                for order_item in order.order_items
+                if order_item.movie
+            ]
         )
         order_schema = OrderListSchema(
             created_at=order.created_at,
