@@ -62,9 +62,11 @@ async def stripe_webhook(request: Request, db: AsyncSession):
         session = event["data"]["object"]
         order_id = session["metadata"]["order_id"]
         order_result = await db.execute(
-            select(OrderModel).where(OrderModel.id == order_id).options(
-                selectinload(OrderModel.user),
-                selectinload(OrderModel.order_items))
+            select(OrderModel)
+            .where(OrderModel.id == order_id)
+            .options(
+                selectinload(OrderModel.user), selectinload(OrderModel.order_items)
+            )
         )
         order = order_result.one_or_none()
         if not order:
@@ -99,7 +101,9 @@ async def stripe_webhook(request: Request, db: AsyncSession):
         session = event["data"]["object"]
         order_id = session.get("metadata", {}).get("order_id")
         order_result = await db.execute(
-            select(OrderModel).where(OrderModel.id == order_id)
+            select(OrderModel)
+            .where(OrderModel.id == order_id)
+            .options(selectinload(OrderModel.user))
         )
         order = order_result.one_or_none()
         if not order:
@@ -107,6 +111,11 @@ async def stripe_webhook(request: Request, db: AsyncSession):
             return {"status": "received"}
         order.status = OrderStatusEnum.CANCELED
         await db.commit()
+        send_email.delay(
+            subject="Payment failed",
+            body="try different payment method",
+            receiver_email=order.user.email,
+        )
         return {"status": "received"}
     elif event["type"] == "checkout.session.expired":
         session = event["data"]["object"]
