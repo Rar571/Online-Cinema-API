@@ -58,7 +58,6 @@ class GenreModel(Base):
         "MovieModel",
         secondary="movie_genres",
         back_populates="genres",
-        cascade="all, delete-orphan",
     )
 
 
@@ -72,7 +71,6 @@ class StarModel(Base):
         "MovieModel",
         secondary="movie_stars",
         back_populates="stars",
-        cascade="all, delete-orphan",
     )
 
 
@@ -86,7 +84,6 @@ class DirectorModel(Base):
         "MovieModel",
         secondary="movie_directors",
         back_populates="directors",
-        cascade="all, delete-orphan",
     )
 
 
