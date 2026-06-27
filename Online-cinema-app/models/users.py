@@ -95,6 +95,7 @@ class UserModel(Base):
     cart: Mapped[Optional["CartModel"]] = relationship(
         "CartModel", back_populates="user", uselist=False
     )
+    orders: Mapped[List["OrderModel"]] = relationship("OrderModel", back_populates="user")
     user_payments: Mapped[List["PaymentModel"]] = relationship(
         "PaymentModel", back_populates="user"
     )
