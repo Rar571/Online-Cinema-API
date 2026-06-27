@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from dependencies.authorization import get_groups_id
+from routes.payments import payment_router
 from routes.users import users_router
 from routes.movies import movies_router
 
@@ -14,3 +15,4 @@ async def startup():
 
 app.include_router(users_router, prefix="/users")
 app.include_router(movies_router, prefix="/movies")
+app.include_router(payment_router)
