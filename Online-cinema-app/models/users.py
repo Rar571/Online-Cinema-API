@@ -16,14 +16,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.session_postgresql import Base
-from models.movies import (
-    LikeAndDislikeModel,
-    FavoriteMovieModel,
-    RateMovieModel,
-    CommentMovieModel,
-    CommentRepliesModel,
-)
-from models.shopping_cart import CartModel
 from security.token import generate_token
 
 
@@ -85,23 +77,26 @@ class UserModel(Base):
     password_reset_token: Mapped[List["PasswordResetTokenModel"]] = relationship(
         "PasswordResetTokenModel", back_populates="user", cascade="all, delete-orphan"
     )
-    user_likes_and_dislikes: Mapped[List[LikeAndDislikeModel]] = relationship(
-        LikeAndDislikeModel, back_populates="user", cascade="all, delete-orphan"
+    user_likes_and_dislikes: Mapped[List["LikeAndDislikeModel"]] = relationship(
+        "LikeAndDislikeModel", back_populates="user", cascade="all, delete-orphan"
     )
-    user_favorite_movies: Mapped[List[FavoriteMovieModel]] = relationship(
-        FavoriteMovieModel, back_populates="user", cascade="all, delete-orphan"
+    user_favorite_movies: Mapped[List["FavoriteMovieModel"]] = relationship(
+        "FavoriteMovieModel", back_populates="user", cascade="all, delete-orphan"
     )
-    user_rates: Mapped[List[RateMovieModel]] = relationship(
-        RateMovieModel, back_populates="user", cascade="all, delete-orphan"
+    user_rates: Mapped[List["RateMovieModel"]] = relationship(
+        "RateMovieModel", back_populates="user", cascade="all, delete-orphan"
     )
-    user_comments: Mapped[List[CommentMovieModel]] = relationship(
-        CommentMovieModel, back_populates="user", cascade="all, delete-orphan"
+    user_comments: Mapped[List["CommentMovieModel"]] = relationship(
+        "CommentMovieModel", back_populates="user", cascade="all, delete-orphan"
     )
-    user_replies: Mapped[List[CommentRepliesModel]] = relationship(
-        CommentRepliesModel, back_populates="user", cascade="all, delete-orphan"
+    user_replies: Mapped[List["CommentRepliesModel"]] = relationship(
+        "CommentRepliesModel", back_populates="user", cascade="all, delete-orphan"
     )
     cart: Mapped[Optional["CartModel"]] = relationship(
         "CartModel", back_populates="user", uselist=False
+    )
+    user_payments: Mapped[List["PaymentModel"]] = relationship(
+        "PaymentModel", back_populates="user"
     )
 
 

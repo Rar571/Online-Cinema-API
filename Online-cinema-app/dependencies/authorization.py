@@ -6,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dependencies.users import get_current_user_model
 from models.users import UserModel, UserGroupModel, UserGroupEnum
 
-
 group_moderators_id = None
 group_admins_id = None
 group_users_id = None
