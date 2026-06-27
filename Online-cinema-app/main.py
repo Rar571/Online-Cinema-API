@@ -4,7 +4,7 @@ from fastapi import FastAPI
 
 from db.session_postgresql import postgresql_engine, Base, AsyncPostgresqlSessionLocal
 from dependencies.authorization import get_groups_id
-from routes.users import router
+from routes.users import users_router
 
 app = FastAPI()
 
@@ -19,4 +19,4 @@ async def lifespan(app: FastAPI):
     await postgresql_engine.dispose()
 
 
-app.include_router(router, prefix="/users")
+app.include_router(users_router, prefix="/users")
