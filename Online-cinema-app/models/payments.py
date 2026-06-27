@@ -39,7 +39,7 @@ class PaymentModel(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     status: Mapped[StatusEnum] = mapped_column(
-        Enum(StatusEnum), nullable=False, default=StatusEnum.SUCCESSFUL
+        Enum(StatusEnum, name="payment_status_enum"), nullable=False, default=StatusEnum.SUCCESSFUL
     )
     amount: Mapped[Decimal] = mapped_column(
         Numeric(precision=10, scale=2, asdecimal=True), nullable=False

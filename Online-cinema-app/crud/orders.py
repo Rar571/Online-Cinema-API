@@ -126,8 +126,7 @@ async def view_users_orders(
     statuses: list[OrderStatusEnum] | None = None,
 ):
     orders = select(OrderModel).options(
-        selectinload(OrderModel.order_items).
-        selectinload(OrderItemModel.movie)
+        selectinload(OrderModel.order_items).selectinload(OrderItemModel.movie)
     )
     if users_id:
         orders = orders.filter(OrderModel.user_id.in_(users_id))

@@ -35,7 +35,7 @@ class UserGroupModel(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[UserGroupEnum] = mapped_column(
-        Enum(UserGroupEnum), unique=True, nullable=False
+        Enum(UserGroupEnum, name="groups_enum"), unique=True, nullable=False
     )
 
     users: Mapped[List["UserModel"]] = relationship("UserModel", back_populates="group")
@@ -95,7 +95,9 @@ class UserModel(Base):
     cart: Mapped[Optional["CartModel"]] = relationship(
         "CartModel", back_populates="user", uselist=False
     )
-    orders: Mapped[List["OrderModel"]] = relationship("OrderModel", back_populates="user")
+    orders: Mapped[List["OrderModel"]] = relationship(
+        "OrderModel", back_populates="user"
+    )
     user_payments: Mapped[List["PaymentModel"]] = relationship(
         "PaymentModel", back_populates="user"
     )
@@ -113,7 +115,7 @@ class UserProfileModel(Base):
     last_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     avatar: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     gender: Mapped[Optional[GenderEnum]] = mapped_column(
-        Enum("GenderEnum"), nullable=True
+        Enum("GenderEnum", name="gender_enum"), nullable=True
     )
     date_of_birth: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     info: Mapped[str] = mapped_column(Text, nullable=False)

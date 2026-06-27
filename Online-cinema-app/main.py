@@ -9,9 +9,29 @@ from routes.shopping_cart import cart_router
 from routes.payments import payment_router
 from routes.users import users_router
 from routes.movies import movies_router
-
-
-app = FastAPI()
+from models.users import (
+    UserGroupModel,
+    UserModel,
+    UserProfileModel,
+    ActivationTokenModel,
+    PasswordResetTokenModel,
+    RefreshTokenModel,
+)
+from models.movies import (
+    MovieModel,
+    GenreModel,
+    StarModel,
+    DirectorModel,
+    CertificationModel,
+    LikeAndDislikeModel,
+    FavoriteMovieModel,
+    RateMovieModel,
+    CommentMovieModel,
+    CommentRepliesModel,
+)
+from models.shopping_cart import CartModel, CartItemModel
+from models.orders import OrderModel, OrderItemModel
+from models.payments import PaymentModel, PaymentItemModel
 
 
 @asynccontextmanager
@@ -22,6 +42,9 @@ async def lifespan(app: FastAPI):
         await get_groups_id(db)
     yield
     await postgresql_engine.dispose()
+
+
+app = FastAPI(lifespan=lifespan)
 
 
 app.include_router(users_router, prefix="/users")
