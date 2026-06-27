@@ -145,7 +145,7 @@ class RefreshTokenModel(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     user: Mapped["UserModel"] = relationship(
-        "UserModel", back_populates="password_reset_token"
+        "UserModel", back_populates="refresh_token"
     )
     token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(
