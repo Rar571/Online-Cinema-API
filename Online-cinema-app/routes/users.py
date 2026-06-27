@@ -58,7 +58,7 @@ async def register_user(
     hashed_password = hash_password(user_data.password)
     try:
         new_user = UserModel(
-            email=user_data.email, hashed_password=hashed_password, group_id=group.id
+            email=user_data.email, _hashed_password=hashed_password, group_id=group.id
         )
         db.add(new_user)
         await db.flush()
@@ -71,11 +71,11 @@ async def register_user(
             body=f"http://127.0.0.1:8000/users/activate?token={activation_token.token}. This link is valid for 24 hours",
             receiver_email=user_data.email,
         )
-    except Exception:
+    except Exception as e:
         await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error was occurred during user creation. Try again later.",
+            detail=f"An error was occurred during user creation, error: {e}. Try again later.",
         )
     else:
         return JSONResponse(
@@ -131,7 +131,7 @@ async def get_new_activation_token(
 
 @users_router.get("/activate/")
 async def activate_account(
-    user_data: UserActivationSchema, db: AsyncSession = Depends(get_db)
+    user_data: UserActivationSchema = Depends(), db: AsyncSession = Depends(get_db)
 ):
     user = await get_user_by_email(user_email=user_data.email, db=db)
     result_token = await db.execute(

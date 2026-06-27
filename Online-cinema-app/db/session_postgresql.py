@@ -5,9 +5,9 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine, Asyn
 from sqlalchemy.orm import declarative_base
 
 POSTGRESQL_DATABASE_URL = (
-    f"postgresql+asyncpg://{os.getenv("POSTGRES_USERNAME")}:"
-    f"{os.getenv("POSTGRES_PASSWORD")}@{os.getenv("POSTGRES_HOST")}:"
-    f"{os.getenv("POSTGRES_DB_PORT")}/{os.getenv("POSTGRES_DB")}"
+    f"postgresql+asyncpg://{os.getenv('POSTGRES_USERNAME', 'postgres')}:"
+    f"{os.getenv('POSTGRES_PASSWORD', 'postgres')}@{os.getenv('POSTGRES_HOST', 'postgres')}:"
+    f"{os.getenv('POSTGRES_DB_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'postgres')}"
 )
 
 postgresql_engine = create_async_engine(POSTGRESQL_DATABASE_URL, echo=False)

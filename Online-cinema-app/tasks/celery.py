@@ -10,12 +10,12 @@ from sqlalchemy.orm import sessionmaker
 
 from models.users import ActivationTokenModel
 
-app = Celery("tasks", broker="redis://localhost:6379/0")
+app = Celery("tasks", broker=f"redis://{os.getenv('REDIS_HOST', 'redis')}:6379/0")
 
 POSTGRESQL_DATABASE_URL = (
-    f"postgresql://{os.getenv("POSTGRES_USERNAME")}:"
-    f"{os.getenv("POSTGRES_PASSWORD")}@{os.getenv("POSTGRES_HOST")}:"
-    f"{os.getenv("POSTGRES_DB_PORT")}/{os.getenv("POSTGRES_DB")}"
+    f"postgresql://{os.getenv('POSTGRES_USERNAME')}:"
+    f"{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_HOST')}:"
+    f"{os.getenv('POSTGRES_DB_PORT')}/{os.getenv('POSTGRES_DB')}"
 )
 
 engine = create_engine(POSTGRESQL_DATABASE_URL, echo=False)
@@ -25,7 +25,7 @@ SessionLocal = sessionmaker(bind=engine)
 
 @app.task(bind=True, max_retries=3, default_retry_delay=60)
 def send_email(self, subject: str, body: str, receiver_email: str):
-    smtp_server = "://gmail.com"
+    smtp_server = "smtp.gmail.com"
     smtp_port = 587
     sender_email = os.getenv("SENDER_EMAIL")
     sender_password = os.getenv("SENDER_PASSWORD")
@@ -65,7 +65,7 @@ def delete_expired_activation_tokens():
 
 app.conf.beat_schedule = {
     "clear_expired_activation_tokens": {
-        "celery": "celery.delete_expired_activation_tokens",
+        "task": "celery.delete_expired_activation_tokens",
         "schedule": crontab(hour=14, minute=0),
     }
 }
