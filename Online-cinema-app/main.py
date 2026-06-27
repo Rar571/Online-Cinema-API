@@ -13,4 +13,4 @@ async def startup():
 
 
 app.include_router(users_router, prefix="/users")
-app.include_router(movies_router, prefix="/movies")
+app.include_router(movies_router)
