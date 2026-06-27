@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from db.session_postgresql import postgresql_engine, Base, AsyncPostgresqlSessionLocal
 from dependencies.authorization import get_groups_id
+from routes.orders import orders_router
 from routes.shopping_cart import cart_router
 from routes.users import users_router
 from routes.movies import movies_router
@@ -25,4 +26,4 @@ async def lifespan(app: FastAPI):
 app.include_router(users_router, prefix="/users")
 app.include_router(movies_router)
 app.include_router(cart_router)
-
+app.include_router(orders_router)
