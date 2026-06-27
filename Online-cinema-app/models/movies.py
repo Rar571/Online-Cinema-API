@@ -97,7 +97,7 @@ class CertificationModel(Base):
     name: Mapped[str] = mapped_column(String(60), unique=True, nullable=False)
 
     movies: Mapped[List["MovieModel"]] = relationship(
-        "MovieModel", back_populates="certification", cascade="all, delete-orphans"
+        "MovieModel", back_populates="certification", cascade="all, delete-orphan"
     )
 
 
