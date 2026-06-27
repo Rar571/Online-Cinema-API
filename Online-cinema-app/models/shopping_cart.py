@@ -17,7 +17,7 @@ class CartModel(Base):
     user: Mapped["UserModel"] = relationship("UserModel", back_populates="cart")
 
     cart_items: Mapped[List["CartItemModel"]] = relationship(
-        "CartItem", back_populates="cart", cascade="all, delete-orphan"
+        "CartItemModel", back_populates="cart", cascade="all, delete-orphan"
     )
 
 
