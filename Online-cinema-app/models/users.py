@@ -77,6 +77,13 @@ class UserModel(Base):
     password_reset_token: Mapped[List["PasswordResetTokenModel"]] = relationship(
         "PasswordResetTokenModel", back_populates="user", cascade="all, delete-orphan"
     )
+    cart: Mapped["CartModel"] = relationship("CartModel", back_populates="user")
+    orders: Mapped[List["OrderModel"]] = relationship(
+        "OrderModel", back_populates="user"
+    )
+    user_payments: Mapped[List["PaymentModel"]] = relationship(
+        "PaymentModel", back_populates="user"
+    )
 
 
 class UserProfileModel(Base):
