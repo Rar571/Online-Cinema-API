@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from dependencies.users import get_current_user_model
 from models.users import UserModel, UserGroupModel, UserGroupEnum
 
+
 group_moderators_id = None
 group_admins_id = None
 group_users_id = None
@@ -23,6 +24,7 @@ async def get_groups_id(db: AsyncSession):
         await db.flush()
 
     group_moderators_id = group_moderators.id
+
     group_admins_result = await db.execute(
         select(UserGroupModel).where(UserGroupModel.name == UserGroupEnum.ADMIN)
     )
@@ -33,6 +35,7 @@ async def get_groups_id(db: AsyncSession):
         await db.flush()
 
     group_admins_id = group_admins.id
+
     group_users_result = await db.execute(
         select(UserGroupModel).where(UserGroupModel.name == UserGroupEnum.USER)
     )
