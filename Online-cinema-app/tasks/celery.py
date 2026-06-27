@@ -13,9 +13,9 @@ from models.users import ActivationTokenModel
 app = Celery("tasks", broker=f"redis://{os.getenv('REDIS_HOST', 'redis')}:6379/0")
 
 POSTGRESQL_DATABASE_URL = (
-    f"postgresql://{os.getenv('POSTGRES_USERNAME')}:"
-    f"{os.getenv('POSTGRES_PASSWORD')}@{os.getenv('POSTGRES_HOST')}:"
-    f"{os.getenv('POSTGRES_DB_PORT')}/{os.getenv('POSTGRES_DB')}"
+    f"postgresql+asyncpg://{os.getenv('POSTGRES_USERNAME', 'postgres')}:"
+    f"{os.getenv('POSTGRES_PASSWORD', 'postgres')}@{os.getenv('POSTGRES_HOST', 'postgres')}:"
+    f"{os.getenv('POSTGRES_DB_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'postgres')}"
 )
 
 engine = create_engine(POSTGRESQL_DATABASE_URL, echo=False)
