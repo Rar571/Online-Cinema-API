@@ -224,7 +224,9 @@ async def pay_for_cart(db: AsyncSession, current_user: UserModel):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You already have created this pending order",
         )
-    current_movies_result = await db.execute(select(MovieModel).where(MovieModel.id.in_(movies_id)))
+    current_movies_result = await db.execute(
+        select(MovieModel).where(MovieModel.id.in_(movies_id))
+    )
     current_movies = current_movies_result.scalars().all()
     total_amount = Decimal("0")
     movies_dict = {movie.id: movie.price for movie in current_movies}
@@ -237,12 +239,14 @@ async def pay_for_cart(db: AsyncSession, current_user: UserModel):
     await db.commit()
     try:
         result = await create_checkout_session(
-        order_id=order.id, db=db, current_user=current_user
+            order_id=order.id, db=db, current_user=current_user
         )
     except Exception:
         await db.rollback()
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-                            detail="Try later, an error with stripe occurred")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Try later, an error with stripe occurred",
+        )
     if deleted_movies_id:
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
@@ -257,7 +261,7 @@ async def pay_for_cart(db: AsyncSession, current_user: UserModel):
         status_code=status.HTTP_201_CREATED,
         content={
             "detail": f"Order was created successfully, "
-                      f"url address for payment: {result}"
+            f"url address for payment: {result}"
         },
     )
 

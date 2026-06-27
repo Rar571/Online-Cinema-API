@@ -4,8 +4,6 @@ from sqlalchemy import Integer, ForeignKey, DateTime, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.session_postgresql import Base
-from models.movies import MovieModel
-from models.users import UserModel
 from datetime import datetime
 
 
@@ -41,4 +39,4 @@ class CartItemModel(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = UniqueConstraint("cart_id", "movie_id", name="unique_cart_item")
+    __table_args__ = (UniqueConstraint("cart_id", "movie_id", name="unique_cart_item"),)
