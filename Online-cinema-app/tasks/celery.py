@@ -1,26 +1,27 @@
 import os
+from datetime import datetime, timezone
 from email.message import EmailMessage
 import smtplib
+
 from celery import Celery
 from celery.schedules import crontab
-from sqlalchemy import select, create_engine
-from datetime import datetime, timezone
-
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from models.users import ActivationTokenModel
 
+
 app = Celery("tasks", broker=f"redis://{os.getenv('REDIS_HOST', 'redis')}:6379/0")
 
+
 POSTGRESQL_DATABASE_URL = (
-    f"postgresql+asyncpg://{os.getenv('POSTGRES_USERNAME', 'postgres')}:"
+    f"postgresql://{os.getenv('POSTGRES_USERNAME', 'postgres')}:" 
     f"{os.getenv('POSTGRES_PASSWORD', 'postgres')}@{os.getenv('POSTGRES_HOST', 'postgres')}:"
     f"{os.getenv('POSTGRES_DB_PORT', '5432')}/{os.getenv('POSTGRES_DB', 'postgres')}"
 )
 
 engine = create_engine(POSTGRESQL_DATABASE_URL, echo=False)
-
-SessionLocal = sessionmaker(bind=engine)
+SessionLocal = sessionmaker(bind=engine, expire_on_commit=False)
 
 
 @app.task(bind=True, max_retries=3, default_retry_delay=60)
@@ -45,20 +46,24 @@ def send_email(self, subject: str, body: str, receiver_email: str):
         raise self.retry(exc=exc)
 
 
-@app.task()
+@app.task(name="celery.delete_expired_activation_tokens")
 def delete_expired_activation_tokens():
     db = SessionLocal()
-    result = db.execute(
-        select(ActivationTokenModel).where(
-            ActivationTokenModel.expires_at < datetime.now(timezone.utc)
-        )
-    )
-    activation_tokens = result.scalars().all()
     try:
+        result = db.execute(
+            select(ActivationTokenModel).where(
+                ActivationTokenModel.expires_at < datetime.now(timezone.utc)
+            )
+        )
+        activation_tokens = result.scalars().all()
+
         if activation_tokens:
             for token in activation_tokens:
                 db.delete(token)
             db.commit()
+    except Exception as e:
+        db.rollback()
+        print(f"Error during token deletion: {e}")
     finally:
         db.close()
 
