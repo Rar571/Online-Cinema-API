@@ -18,7 +18,6 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from db.session_postgresql import Base
-from models.users import UserModel
 
 movie_genres = Table(
     "movie_genres",
@@ -146,19 +145,21 @@ class MovieModel(Base):
         "CommentMovieModel", back_populates="movie", cascade="all, delete-orphan"
     )
 
-    __table_args__ = UniqueConstraint("name", "year", "time", name="unique_movie")
+    __table_args__ = (UniqueConstraint("name", "year", "time", name="unique_movie"),)
 
 
 class LikeAndDislikeModel(Base):
     __tablename__ = "likes_and_dislikes"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    like_type: Mapped[LikeTypeEnum] = mapped_column(Enum(LikeTypeEnum), nullable=False)
+    like_type: Mapped[LikeTypeEnum] = mapped_column(
+        Enum(LikeTypeEnum, name="like_and_dislike_enum"), nullable=False
+    )
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    user: Mapped[UserModel] = relationship(
-        UserModel, back_populates="user_likes_and_dislikes"
+    user: Mapped["UserModel"] = relationship(
+        "UserModel", back_populates="user_likes_and_dislikes"
     )
     movie_id: Mapped[int] = mapped_column(
         ForeignKey("movies.id", ondelete="CASCADE"), nullable=False
@@ -167,8 +168,8 @@ class LikeAndDislikeModel(Base):
         MovieModel, back_populates="movie_likes_and_dislikes"
     )
 
-    __table_args__ = UniqueConstraint(
-        "user_id", "movie_id", name="unique_movie_user_like"
+    __table_args__ = (
+        UniqueConstraint("user_id", "movie_id", name="unique_movie_user_like"),
     )
 
 
@@ -185,8 +186,8 @@ class FavoriteMovieModel(MovieModel):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    user: Mapped[UserModel] = relationship(
-        UserModel, back_populates="user_favorite_movies"
+    user: Mapped["UserModel"] = relationship(
+        "UserModel", back_populates="user_favorite_movies"
     )
 
 
@@ -202,10 +203,10 @@ class RateMovieModel(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    user: Mapped[UserModel] = relationship(UserModel, back_populates="user_rates")
+    user: Mapped["UserModel"] = relationship("UserModel", back_populates="user_rates")
 
-    __table_args__ = CheckConstraint(
-        "rate > 0 AND rate < 11", name="range from 1 to 10"
+    __table_args__ = (
+        CheckConstraint("rate > 0 AND rate < 11", name="range from 1 to 10"),
     )
 
 
@@ -223,7 +224,9 @@ class CommentMovieModel(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    user: Mapped[UserModel] = relationship(UserModel, back_populates="user_comments")
+    user: Mapped["UserModel"] = relationship(
+        "UserModel", back_populates="user_comments"
+    )
 
     replies: Mapped[List["CommentRepliesModel"]] = relationship(
         "CommentRepliesModel", back_populates="comment", cascade="all, delete-orphan"
@@ -250,7 +253,7 @@ class CommentRepliesModel(Base):
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    user: Mapped[UserModel] = relationship(UserModel, back_populates="user_replies")
+    user: Mapped["UserModel"] = relationship("UserModel", back_populates="user_replies")
 
     @property
     def user_name(self) -> str | None:
