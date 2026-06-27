@@ -41,4 +41,4 @@ class CartItemModel(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    __table_args__ = UniqueConstraint("cart_id", "movie_id", name="unique_cart_movie")
+    __table_args__ = UniqueConstraint("cart_id", "movie_id", name="unique_cart_item")

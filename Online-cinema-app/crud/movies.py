@@ -16,6 +16,8 @@ from models.movies import (
     CommentRepliesModel,
     StarModel,
 )
+from models.orders import OrderItemModel, OrderModel
+from models.shopping_cart import CartItemModel
 from models.users import UserModel
 from schemas.movies import (
     MovieCreateSchema,
@@ -130,9 +132,29 @@ async def movie_delete(movie_id: int, db: AsyncSession):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found"
         )
+    purchased_movie = await db.execute(
+        select(OrderModel).where(
+            OrderModel.order_items.any(OrderItemModel.movie_id == movie.id)
+        )
+    )
+    purchased_movie = purchased_movie.scalar_one_or_none()
+    if purchased_movie:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This movie is already purchased",
+        )
+    movies_in_cart = await db.execute(
+        select(CartItemModel).where(CartItemModel.movie_id == movie.id)
+    )
+    movies_in_cart = movies_in_cart.scalars()
+    carts_id = [cart_item.cart_id for cart_item in movies_in_cart]
+    if carts_id:
+        detail = {"detail": f"Movie is in the user's cart(s) with id: {carts_id}"}
+    else:
+        detail = {"detail": "movie is deleted"}
     await db.delete(movie)
     await db.commit()
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return JSONResponse(status_code=status.HTTP_200_OK, content=detail)
 
 
 async def like_or_dislike_movie(
