@@ -62,3 +62,4 @@ class OrderItemModel(Base):
     price_at_order: Mapped[Decimal] = mapped_column(
         Numeric(precision=10, scale=2, asdecimal=True), nullable=False
     )
+    order_payment_items: Mapped[List["PaymentItemModel"]] = relationship("PaymentItemModel", back_populates="order_item")
