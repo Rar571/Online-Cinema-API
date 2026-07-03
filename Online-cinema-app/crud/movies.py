@@ -2,7 +2,7 @@ from fastapi import HTTPException, status, Response
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 
 from dependencies.movies import filter_sort_search_movies
 from models.movies import (
