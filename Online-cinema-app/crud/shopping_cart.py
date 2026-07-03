@@ -18,7 +18,7 @@ async def cart_movies_list(db: AsyncSession, current_user: UserModel):
     cart_result = await db.execute(
         select(CartModel).where(CartModel.user_id == current_user.id)
     )
-    cart = cart_result.one_or_none()
+    cart = cart_result.scalar_one_or_none()
     if not cart:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Cart is not created yet"
@@ -51,7 +51,7 @@ async def add_movie_to_cart(
             OrderModel.order_items.any(OrderItemModel.movie_id == movie_data.movie_id),
         )
     )
-    order = order_result.one_or_none()
+    order = order_result.scalar_one_or_none()
     if order:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -63,7 +63,7 @@ async def add_movie_to_cart(
             CartModel.cart_items.any(CartItemModel.movie_id == movie_data.movie_id),
         )
     )
-    existing_movie = existing_movie_result.one_or_none()
+    existing_movie = existing_movie_result.scalar_one_or_none()
     if existing_movie:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -73,7 +73,7 @@ async def add_movie_to_cart(
     cart_result = await db.execute(
         select(CartModel).where(CartModel.user_id == current_user.id)
     )
-    cart = cart_result.one_or_none()
+    cart = cart_result.scalar_one_or_none()
     movie_result = await db.execute(
         select(MovieModel).where(MovieModel.id == movie_data.movie_id)
     )
@@ -113,7 +113,7 @@ async def remove_movie_from_cart(
     cart_result = await db.execute(
         select(CartModel).where(CartModel.user_id == current_user.id)
     )
-    cart = cart_result.one_or_none()
+    cart = cart_result.scalar_one_or_none()
     if not cart:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -138,7 +138,7 @@ async def clear_cart(db: AsyncSession, current_user: UserModel):
     cart_result = await db.execute(
         select(CartModel).where(CartModel.user_id == current_user.id)
     )
-    cart = cart_result.one_or_none()
+    cart = cart_result.scalar_one_or_none()
     if not cart:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -162,7 +162,7 @@ async def pay_for_cart(db: AsyncSession, current_user: UserModel):
         .where(CartModel.user_id == current_user.id)
         .options(selectinload(CartModel.cart_items))
     )
-    cart = cart_result.one_or_none()
+    cart = cart_result.scalar_one_or_none()
     if not cart:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Cart not found"
