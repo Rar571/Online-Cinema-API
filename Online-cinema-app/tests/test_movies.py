@@ -1,8 +1,9 @@
+import json
 from unittest.mock import MagicMock, patch, AsyncMock
 
 import pytest
 
-from dependencies.movies import filter_sort_search_movies
+
 from models.movies import LikeTypeEnum
 from decimal import Decimal
 
@@ -222,7 +223,6 @@ async def test_list_favorite_movies_with_filters(client, mock_db):
         )
         mock_filter.assert_called_once()
         call_kwargs = mock_filter.call_args.kwargs
-        print(response.json())
         assert response.status_code == 200
         assert call_kwargs["name"] == "test"
         assert call_kwargs["year"] == 2024
@@ -283,14 +283,13 @@ async def test_add_favorite_movie_is_already(client, mock_db):
 @pytest.mark.asyncio
 async def test_delete_favorite_movie_success(client, mock_db):
     existing_favorite = MagicMock(id=1)
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=existing_favorite)
+    mock_db.execute.return_value.scalar_one_or_none.return_value = existing_favorite
     mock_db.delete = AsyncMock()
     mock_db.commit = AsyncMock()
     response = await client.delete(
         "/movies/favorites/",
-        json={
-            "movie_id": 1
-        }
+        content=json.dumps({"movie_id": 1}),
+        headers={"Content-Type": "application/json"}
     )
     mock_db.delete.assert_called_once_with(existing_favorite)
     mock_db.commit.assert_called_once()
@@ -302,9 +301,8 @@ async def test_delete_favorite_movie_not_found(client, mock_db):
     mock_db.execute.return_value.scalar_one_or_none.return_value = None
     response = await client.delete(
         "/movies/favorites/",
-        json={
-            "movie_id": 5
-        }
+        content=json.dumps({"movie_id": 1}),
+        headers={"Content-Type": "application/json"}
     )
     assert response.status_code == 404
 
