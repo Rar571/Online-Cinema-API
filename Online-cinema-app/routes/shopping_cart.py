@@ -37,17 +37,6 @@ async def add_movie(
     )
 
 
-@cart_router.delete("/cart/{movie_id}/", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_movie_from_cart(
-    movie_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user_model),
-):
-    return await remove_movie_from_cart(
-        movie_id=movie_id, db=db, current_user=current_user
-    )
-
-
 @cart_router.delete("/cart/", status_code=status.HTTP_200_OK)
 async def clear_user_cart(
     db: AsyncSession = Depends(get_db),
@@ -62,6 +51,17 @@ async def pay_for_user_cart(
     current_user: UserModel = Depends(get_current_user_model),
 ):
     return await pay_for_cart(db=db, current_user=current_user)
+
+
+@cart_router.delete("/cart/{movie_id}/", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_movie_from_cart(
+    movie_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserModel = Depends(get_current_user_model),
+):
+    return await remove_movie_from_cart(
+        movie_id=movie_id, db=db, current_user=current_user
+    )
 
 
 @cart_router.get("/cart/{user_id}/", status_code=status.HTTP_200_OK)
