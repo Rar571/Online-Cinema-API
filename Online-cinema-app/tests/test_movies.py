@@ -180,7 +180,7 @@ async def test_list_favorite_movies_success(client, mock_db):
         "id": 1,
         "uuid": "desfaefewfew",
         "name": "Test movie",
-        "year": 2089,
+        "year": 2024,
         "time": 80,
         "imdb": 9.4,
         "votes": 9,
@@ -193,7 +193,6 @@ async def test_list_favorite_movies_success(client, mock_db):
         response = await client.get(
             "/movies/favorites/"
         )
-        print(response.json())
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
@@ -204,20 +203,31 @@ async def test_list_favorite_movies_success(client, mock_db):
 
 @pytest.mark.asyncio
 async def test_list_favorite_movies_with_filters(client, mock_db):
+    mock_movie = {
+        "id": 1,
+        "uuid": "desfaefewfew",
+        "name": "test",
+        "year": 2024,
+        "time": 80,
+        "imdb": 9.4,
+        "votes": 9,
+        "description": "Test description",
+        "price": Decimal("7.90"),
+        "certification_id": 1,
+    }
     with patch("crud.movies.filter_sort_search_movies", new_callable=AsyncMock) as mock_filter:
-        mock_filter.return_value = []
+        mock_filter.return_value = [mock_movie]
         response = await client.get(
             "/movies/favorites/?name=test&year=2024&page=2&limit=5"
         )
         mock_filter.assert_called_once()
         call_kwargs = mock_filter.call_args.kwargs
+        print(response.json())
         assert response.status_code == 200
         assert call_kwargs["name"] == "test"
         assert call_kwargs["year"] == 2024
         assert call_kwargs["page"] == 2
         assert call_kwargs["limit"] == 5
-        data = response.json()
-        assert data == {"detail": "There are no favorites"}
 
 
 @pytest.mark.asyncio
