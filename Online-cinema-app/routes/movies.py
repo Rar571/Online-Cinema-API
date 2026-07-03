@@ -30,7 +30,8 @@ from crud.movies import (
     create_actor,
     detail_actor,
     update_actor,
-    delete_actor, list_favorite_movies,
+    delete_actor,
+    list_favorite_movies,
 )
 from db.session_postgresql import get_db
 from dependencies.authorization import require_moderator
@@ -63,10 +64,33 @@ async def comment_reply_create(
 
 @movies_router.get("/movies/favorites/", status_code=status.HTTP_200_OK)
 async def favorite_movies_list_endpoint(
+    name: str | None = None,
+    description: str | None = None,
+    actor_name: str | None = None,
+    director_name: str | None = None,
+    year: int | None = None,
+    imdb: float | None = None,
+    page: int = 1,
+    limit: int = 10,
+    sort_field: str = "id",
+    sort_order: str = "asc",
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
-    return await list_favorite_movies(db=db, current_user=current_user)
+    return await list_favorite_movies(
+        name=name,
+        description=description,
+        actor_name=actor_name,
+        director_name=director_name,
+        year=year,
+        imdb=imdb,
+        page=page,
+        limit=limit,
+        sort_field=sort_field,
+        sort_order=sort_order,
+        db=db,
+        current_user=current_user,
+    )
 
 
 @movies_router.post("/movies/favorites/", status_code=status.HTTP_201_CREATED)
@@ -324,4 +348,3 @@ async def delete_star(
     current_user=Depends(require_moderator),
 ):
     return await delete_actor(actor_id=star_id, db=db)
-
