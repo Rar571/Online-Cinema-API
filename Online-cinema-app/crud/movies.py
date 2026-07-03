@@ -95,7 +95,7 @@ async def movie_detail(movie_id: int, db: AsyncSession):
         )
         .options(selectinload(MovieModel.certification))
     )
-    movie = movie_result.one_or_none()
+    movie = movie_result.scalar_one_or_none()
     if not movie:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found"
@@ -110,7 +110,7 @@ async def movie_update(movie_id: int, movie_data: MovieUpdateSchema, db: AsyncSe
         .where(MovieModel.id == movie_id)
         .options(selectinload(MovieModel.certification))
     )
-    movie = movie_result.one_or_none()
+    movie = movie_result.scalar_one_or_none()
     if not movie:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Movie not found"
@@ -288,7 +288,7 @@ async def get_genres_list(db: AsyncSession):
         .outerjoin(GenreModel.movies)
         .group_by(GenreModel.id)
     )
-    genres = genres_result.scalars().all()
+    genres = genres_result.all()
     if not genres:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="There are no genres"
@@ -310,7 +310,7 @@ async def create_genre(genre_data: GenreSchema, db: AsyncSession):
 
 async def detail_genre(genre_id, db: AsyncSession):
     genre_result = await db.execute(select(GenreModel).where(GenreModel.id == genre_id))
-    genre = genre_result.one_or_none()
+    genre = genre_result.scalar_one_or_none()
     if not genre:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Genre not found"
@@ -321,7 +321,7 @@ async def detail_genre(genre_id, db: AsyncSession):
 
 async def update_genre(genre_id: int, genre_data: GenreSchema, db: AsyncSession):
     genre_result = await db.execute(select(GenreModel).where(GenreModel.id == genre_id))
-    genre = genre_result.one_or_none()
+    genre = genre_result.scalar_one_or_none()
     if not genre:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Genre not found"
@@ -386,14 +386,14 @@ async def detail_actor(actor_id: int, db: AsyncSession):
             status_code=status.HTTP_404_NOT_FOUND, detail="Star not found"
         )
     actor_detail = StarDetailSchema(
-        id=actor.id, name=actor.name, related_movies=actor.related_movies
+        id=actor[0], name=actor[1], related_movies=actor[2]
     )
     return actor_detail
 
 
 async def update_actor(actor_id: int, actor_data, db: AsyncSession):
     actor_result = await db.execute(select(StarModel).where(StarModel.id == actor_id))
-    actor = actor_result.one_or_none()
+    actor = actor_result.scalar_one_or_none()
     if not actor:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Star not found"
@@ -434,7 +434,7 @@ async def rate_movie(
             RateMovieModel.user_id == current_user.id,
         )
     )
-    rate_model = rate_result.one_or_none()
+    rate_model = rate_result.scalar_one_or_none()
     if rate_model:
         if rate_model.rate == rate_data.rate:
             movie_rate_average_result = await db.execute(
@@ -476,14 +476,14 @@ async def list_comments(db: AsyncSession):
             CommentMovieModel.id, CommentMovieModel.user_name, CommentMovieModel.text
         )
     )
-    comments = comments_result.scalars().all()
+    comments = comments_result.all()
     if not comments:
         return []
     comments_list = [
         CommentsListSchema(
-            user_name=comment.user_name,
-            text=comment.text,
-            replies_count=comment.replies_count,
+            user_name=comment[0],
+            text=comment[1],
+            replies_count=comment[2],
         )
         for comment in comments
     ]
@@ -501,15 +501,13 @@ async def create_comment(comment_data: CommentCreateSchema, db: AsyncSession):
 
 async def comment_detail(comment_id: int, db: AsyncSession):
     comment_result = await db.execute(
-        select(
-            CommentMovieModel.user_name,
-            CommentMovieModel.text,
-            CommentMovieModel.replies,
-        )
+        select(CommentMovieModel)
         .where(CommentMovieModel.id == comment_id)
-        .options(selectinload(CommentMovieModel.replies))
+        .options(selectinload(CommentMovieModel.replies),
+                 selectinload(CommentMovieModel.user)
+                 .selectinload(UserModel.user_profile))
     )
-    comment = comment_result.one_or_none()
+    comment = comment_result.scalar_one_or_none()
     if not comment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
@@ -522,7 +520,7 @@ async def comment_detail(comment_id: int, db: AsyncSession):
             for reply in comment.replies
         ]
     comment_detail = CommentDetail(
-        user_name=comment.user_name, text=comment.text, replies=replies
+        user_name=comment.user.user_profile.first_name, text=comment.text, replies=replies
     )
     return comment_detail
 
@@ -535,7 +533,7 @@ async def update_comment(
         .where(CommentMovieModel.id == comment_id)
         .options(selectinload(CommentMovieModel.replies))
     )
-    comment = comment_result.one_or_none()
+    comment = comment_result.scalar_one_or_none()
     if not comment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Comment not found"
@@ -583,7 +581,7 @@ async def update_reply(
     reply_result = await db.execute(
         select(CommentRepliesModel).where(CommentRepliesModel.id == reply_id)
     )
-    reply = reply_result.one_or_none()
+    reply = reply_result.scalar_one_or_none()
     if not reply:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
