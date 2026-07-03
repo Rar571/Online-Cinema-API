@@ -68,7 +68,7 @@ async def register_user(
         await db.refresh(new_user)
         send_email.delay(
             subject="Activation email",
-            body=f"http://127.0.0.1:8000/users/activate?token={activation_token.token}. This link is valid for 24 hours",
+            body=f"localhost:8000/users/activate?token={activation_token.token}. This link is valid for 24 hours",
             receiver_email=user_data.email,
         )
     except Exception as e:
@@ -113,7 +113,7 @@ async def get_new_activation_token(
         await db.refresh(new_token)
         send_email.delay(
             subject="Activation email",
-            body=f"http://127.0.0.1:8000/users/activate?token={new_token.token}. This link is valid for 24 hours",
+            body=f"localhost:8000/users/activate?token={new_token.token}. This link is valid for 24 hours",
             receiver_email=user.email,
         )
     except Exception:
@@ -162,7 +162,7 @@ async def activate_account(
 @users_router.get("/login/")
 async def user_login(user_data: UserLoginSchema, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_email(user_email=user_data.email, db=db)
-    hashed_password = user.hashed_password
+    hashed_password = user._hashed_password
     if not verify_password(user_data.password, hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password"
@@ -290,7 +290,7 @@ async def reset_user_password_request(
         await db.refresh(reset_password_token)
         send_email.delay(
             subject="Reset Password Email",
-            body=f"Your link to reset old password is: http://127.0.0.1:8000/users/reset-password-complete?token={reset_password_token.token}",
+            body=f"Your link to reset old password is: localhost:8000/users/reset-password-complete?token={reset_password_token.token}",
             receiver_email=user.email,
         )
     except Exception:
@@ -326,7 +326,7 @@ async def reset_user_password_complete(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Token is expired"
         )
     hashed_password = hash_password(user_data.new_password)
-    user.hashed_password = hashed_password
+    user._hashed_password = hashed_password
     await db.delete(reset_token)
     await db.commit()
     return JSONResponse(
