@@ -51,13 +51,20 @@ async def test_get_movies_with_filters(client, mock_db):
         assert response.status_code == 200
 
 
+def make_result(scalar_one_or_none=None, scalars_all=None):
+    result = MagicMock()
+    result.scalar_one_or_none.return_value = scalar_one_or_none
+    result.scalars.return_value.all.return_value = scalars_all if scalars_all is not None else []
+    return result
+
+
 @pytest.mark.asyncio
 async def test_delete_movie_success(client, mock_db):
     mock_movie = MagicMock(id=1)
     mock_db.execute.side_effect = [
-        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_movie)),
-        AsyncMock(scalar_one_or_none=MagicMock(return_value=None)),
-        AsyncMock(scalars=MagicMock(return_value=[]))
+        make_result(scalar_one_or_none=mock_movie),
+        make_result(scalar_one_or_none=None),
+        make_result(scalars_all=[])
     ]
     mock_db.delete = AsyncMock()
     mock_db.commit = AsyncMock()
@@ -233,7 +240,6 @@ async def test_list_favorite_movies_with_filters(client, mock_db):
 @pytest.mark.asyncio
 async def test_add_favorite_movie_success(client, mock_db):
     mock_movie = MagicMock(id=1)
-    mock_new_favorite_movie = MagicMock()
     mock_db.execute.side_effect = [
         AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_movie)),
         AsyncMock(scalar_one_or_none=MagicMock(return_value=None))
@@ -246,7 +252,7 @@ async def test_add_favorite_movie_success(client, mock_db):
             "movie_id": 1
         }
     )
-    mock_db.add.assert_called_once_with(mock_new_favorite_movie)
+    mock_db.add.assert_called_once()
     mock_db.commit.assert_called_once()
     assert response.status_code == 201
 
@@ -286,10 +292,12 @@ async def test_delete_favorite_movie_success(client, mock_db):
     mock_db.execute.return_value.scalar_one_or_none.return_value = existing_favorite
     mock_db.delete = AsyncMock()
     mock_db.commit = AsyncMock()
-    response = await client.delete(
+    response = await client.request(
+        "DELETE",
         "/movies/favorites/",
-        content=json.dumps({"movie_id": 1}),
-        headers={"Content-Type": "application/json"}
+        json={
+            "movie_id": 1
+        }
     )
     mock_db.delete.assert_called_once_with(existing_favorite)
     mock_db.commit.assert_called_once()
@@ -299,10 +307,12 @@ async def test_delete_favorite_movie_success(client, mock_db):
 @pytest.mark.asyncio
 async def test_delete_favorite_movie_not_found(client, mock_db):
     mock_db.execute.return_value.scalar_one_or_none.return_value = None
-    response = await client.delete(
+    response = await client.request(
+        "DELETE",
         "/movies/favorites/",
-        content=json.dumps({"movie_id": 1}),
-        headers={"Content-Type": "application/json"}
+        json={
+            "movie_id": 1
+        }
     )
     assert response.status_code == 404
 
@@ -312,7 +322,7 @@ async def test_rate_movie_is_rated(client, mock_db):
     rate = MagicMock(rate=1)
     movie_rate_average = MagicMock()
     mock_db.execute.side_effect = [
-        AsyncMock(one_or_none=MagicMock(return_value=rate)),
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=rate)),
         AsyncMock(scalar=MagicMock(return_value=movie_rate_average))
     ]
     response = await client.post(
@@ -330,7 +340,7 @@ async def test_rate_movie_change_rate(client, mock_db):
     rate = MagicMock(rate=2)
     movie_rate_average = MagicMock()
     mock_db.execute.side_effect = [
-        AsyncMock(one_or_none=MagicMock(return_value=rate)),
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=rate)),
         AsyncMock(scalar=MagicMock(return_value=movie_rate_average))
     ]
     mock_db.commit = AsyncMock()
@@ -350,7 +360,7 @@ async def test_rate_movie_change_rate(client, mock_db):
 async def test_rate_movie_create_rate(client, mock_db):
     movie_rate_average = MagicMock()
     mock_db.execute.side_effect = [
-        AsyncMock(one_or_none=MagicMock(return_value=None)),
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=None)),
         AsyncMock(scalar=MagicMock(return_value=movie_rate_average))
     ]
     mock_db.add = AsyncMock()

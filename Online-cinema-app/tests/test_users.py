@@ -11,8 +11,15 @@ from security.token import generate_access_token, generate_refresh_token
 
 @pytest.mark.asyncio
 async def test_registration_success(client, mock_db):
+    mock_group = MagicMock(name="user")
+    mock_db.execute.side_effect = [
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=None)),
+        AsyncMock(scalar_one=MagicMock(return_value=mock_group))
+    ]
+    mock_db.add = MagicMock()
+    mock_db.flush = AsyncMock()
+    mock_db.commit = AsyncMock()
     with patch("tasks.celery.send_email.delay") as mock_send_email:
-        mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=None)
         response = await client.post(
             "/users/register/",
             json={
@@ -20,6 +27,8 @@ async def test_registration_success(client, mock_db):
                 "password": "Strongpassword123#",
             },
         )
+        assert mock_db.add.call_count == 2
+        mock_db.commit.assert_called_once()
         assert response.status_code == 201
         mock_send_email.assert_called_once()
 
@@ -68,12 +77,16 @@ async def test_registration_invalid_password(client, mock_db):
 @pytest.mark.asyncio
 async def test_activation_token_success(client, mock_db):
     with patch("tasks.celery.send_email.delay") as mock_send_email:
-        mock_user = MagicMock(id=1, is_active=False)
-        mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=None)
+        mock_user = MagicMock(id=1, is_active=False, email="test@test.com")
+        mock_invalid_token = MagicMock(id=1, token=secrets.token_urlsafe(32), user_id=1, expires_at=datetime.now(timezone.utc) - timedelta(days=1))
+        mock_user.activation_token = mock_invalid_token
         mock_db.execute.side_effect = [
-            AsyncMock(scalar_one_or_none=mock_user),
-            AsyncMock(scalar_one_or_none=None),
+            AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_user)),
+            AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_invalid_token)),
         ]
+        mock_db.delete = AsyncMock()
+        mock_db.add = MagicMock()
+        mock_db.commit = AsyncMock()
         response = await client.post(
             "/users/activation_token/",
             json={
@@ -81,13 +94,16 @@ async def test_activation_token_success(client, mock_db):
             }
         )
         assert response.status_code == 201
+        mock_db.delete.assert_called_once_with(mock_invalid_token)
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
         mock_send_email.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_activation_token_user_is_already_active(client, mock_db):
     mock_user = MagicMock(id=1, is_active=True)
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=mock_user)
+    mock_db.execute.return_value.scalar_one_or_none = mock_user
     response = await client.post(
         "/users/activation_token/",
         json={
@@ -102,8 +118,8 @@ async def test_activation_token_unused(client, mock_db):
     mock_user = MagicMock(id=1, is_active=False)
     mock_token = MagicMock(expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc))
     mock_db.execute.side_effect = [
-        AsyncMock(scalar_one_or_none=mock_user),
-        AsyncMock(scalar_one_or_none=mock_token)
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_user)),
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_token))
     ]
     response = await client.post(
         "/users/activation_token/",
@@ -117,12 +133,14 @@ async def test_activation_token_unused(client, mock_db):
 @pytest.mark.asyncio
 async def test_activate_user_success(client, mock_db):
     token = secrets.token_urlsafe(32)
-    mock_user = MagicMock(id=1, is_active=False)
-    mock_token = MagicMock(token=token, expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc))
+    mock_user = MagicMock(id=1, is_active=False, email="test@test.com")
+    mock_token = MagicMock(token=token, expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc), user_id=1)
     mock_db.execute.side_effect = [
-        AsyncMock(scalar_one_or_none=mock_user),
-        AsyncMock(scalar_one_or_none=mock_token)
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_user)),
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_token))
     ]
+    mock_db.delete = AsyncMock()
+    mock_db.commit = AsyncMock()
     response = await client.get(
         "/users/activate/",
         params={
@@ -130,16 +148,19 @@ async def test_activate_user_success(client, mock_db):
             "token": token
         }
     )
+    mock_db.delete.assert_called_once_with(mock_token)
+    mock_db.commit.assert_called_once()
     assert response.status_code == 200
+    assert mock_user.is_active is True
 
 
 @pytest.mark.asyncio
 async def test_activate_user_token_is_invalid(client, mock_db):
-    mock_user = MagicMock(id=1, is_active=False)
-    mock_token = MagicMock(expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc))
+    mock_user = MagicMock(id=1, is_active=False, email="test@test.com")
+    mock_token = MagicMock(id=1, token="invalid_token", user_id=1, expires_at=datetime.now(timezone.utc) - timedelta(days=1))
     mock_db.execute.side_effect = [
-        AsyncMock(scalar_one_or_none=mock_user),
-        AsyncMock(scalar_one_or_none=mock_token)
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_user)),
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_token))
     ]
     response = await client.get(
         "/users/activate/",
@@ -154,12 +175,13 @@ async def test_activate_user_token_is_invalid(client, mock_db):
 @pytest.mark.asyncio
 async def test_activate_user_is_already_active(client, mock_db):
     token = secrets.token_urlsafe(32)
-    mock_user = MagicMock(id=1, is_active=True)
+    mock_user = MagicMock(id=1, is_active=True, email="test@email.com")
     mock_token = MagicMock(token=token, expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc))
     mock_db.execute.side_effect = [
-        AsyncMock(scalar_one_or_none=mock_user),
-        AsyncMock(scalar_one_or_none=mock_token)
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_user)),
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_token))
     ]
+    mock_db.delete = AsyncMock()
     response = await client.get(
         "/users/activate/",
         params={
@@ -167,19 +189,21 @@ async def test_activate_user_is_already_active(client, mock_db):
             "token": token
         }
     )
+    mock_db.delete.assert_called_once_with(mock_token)
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_login_success(client, mock_db):
     hashed_password = hash_password("Strongpassword123")
-    mock_user = MagicMock(id=1, hashed_password=hashed_password, is_active=True)
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=mock_user)
-    mock_db.add = AsyncMock()
+    mock_user = MagicMock(id=1, email="test@test.com", hashed_password=hashed_password, is_active=True)
+    mock_db.execute.return_value.scalar_one_or_none.return_value = mock_user
+    mock_db.add = MagicMock()
     mock_db.commit = AsyncMock()
-    response = await client.get(
+    response = await client.request(
+        "GET",
         "/users/login/",
-        params={
+        json={
             "email": "test@test.com",
             "password": "Strongpassword123"
         }
