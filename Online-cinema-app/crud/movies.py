@@ -53,9 +53,10 @@ async def get_movies_list(
     sort_field: str = "id",
     sort_order: str = "asc",
 ):
+    smth = select(MovieModel)
     movies = await filter_sort_search_movies(
         db=db,
-        movie_model=MovieModel,
+        smth=smth,
         name=name,
         description=description,
         actor_name=actor_name,
@@ -67,9 +68,6 @@ async def get_movies_list(
         sort_field=sort_field,
         sort_order=sort_order,
     )
-    if not movies:
-        movies = []
-        return movies
     movies_list = [
         MovieListSchema.model_validate(movie, from_attributes=True) for movie in movies
     ]
@@ -189,10 +187,12 @@ async def list_favorite_movies(
     sort_field: str = "id",
     sort_order: str = "asc",
 ):
+    smth = select(FavoriteMovieModel).where(
+        FavoriteMovieModel.user_id == current_user.id
+    ).options(selectinload(FavoriteMovieModel.movie))
     movies = await filter_sort_search_movies(
         db=db,
-        movie_model=FavoriteMovieModel,
-        user_id=current_user.id,
+        smth=smth,
         name=name,
         description=description,
         actor_name=actor_name,
@@ -209,7 +209,7 @@ async def list_favorite_movies(
             status_code=status.HTTP_200_OK, content={"detail": "There are no favorites"}
         )
     movies_list = [
-        FavoriteMovieListSchema.model_validate(movie, from_attributes=True)
+        FavoriteMovieListSchema.model_validate(movie.movie, from_attributes=True)
         for movie in movies
     ]
     total = await db.execute(
@@ -385,9 +385,7 @@ async def detail_actor(actor_id: int, db: AsyncSession):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Star not found"
         )
-    actor_detail = StarDetailSchema(
-        id=actor[0], name=actor[1], related_movies=actor[2]
-    )
+    actor_detail = StarDetailSchema(id=actor[0], name=actor[1], related_movies=actor[2])
     return actor_detail
 
 
@@ -503,9 +501,10 @@ async def comment_detail(comment_id: int, db: AsyncSession):
     comment_result = await db.execute(
         select(CommentMovieModel)
         .where(CommentMovieModel.id == comment_id)
-        .options(selectinload(CommentMovieModel.replies),
-                 selectinload(CommentMovieModel.user)
-                 .selectinload(UserModel.user_profile))
+        .options(
+            selectinload(CommentMovieModel.replies),
+            selectinload(CommentMovieModel.user).selectinload(UserModel.user_profile),
+        )
     )
     comment = comment_result.scalar_one_or_none()
     if not comment:
@@ -520,7 +519,9 @@ async def comment_detail(comment_id: int, db: AsyncSession):
             for reply in comment.replies
         ]
     comment_detail = CommentDetail(
-        user_name=comment.user.user_profile.first_name, text=comment.text, replies=replies
+        user_name=comment.user.user_profile.first_name,
+        text=comment.text,
+        replies=replies,
     )
     return comment_detail
 
