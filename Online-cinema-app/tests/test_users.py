@@ -254,7 +254,6 @@ async def test_logout_success(client, mock_db):
     response = await client.post(
         "/users/logout/", headers={"Authorization": f"Bearer {access_token}"}
     )
-    print(response.json())
     mock_db.delete.assert_called_once_with(mock_refresh_token)
     mock_db.commit.assert_called_once()
     assert response.status_code == 200
@@ -296,7 +295,6 @@ async def test_change_user_password_success(client, mock_db):
         headers={"Authorization": f"Bearer {access_token}"},
         json={"old_password": old_password, "new_password": "Newstrongpassword123!!"},
     )
-    print(response.json())
     mock_db.commit.assert_called_once()
     assert response.status_code == 200
 
@@ -343,7 +341,7 @@ async def test_change_password_invalid_old_password(client, mock_db):
         response = await client.post(
             "/users/change-password/",
             headers={"Authorization": f"Bearer {access_token}"},
-            json={"old_password": old_password, "new_password": "Newstrongpassword123!!"},
+            json={"old_password": "invalid_old_password", "new_password": "Newstrongpassword123!!"},
         )
     assert response.status_code == 400
 
