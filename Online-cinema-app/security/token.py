@@ -16,6 +16,7 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 
 def generate_access_token(data: dict):
     to_encode = data.copy()
+    to_encode["sub"] = str(to_encode["sub"])
     expire = datetime.now(timezone.utc) + timedelta(minutes=15)
     to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -23,6 +24,7 @@ def generate_access_token(data: dict):
 
 def generate_refresh_token(data: dict):
     to_encode = data.copy()
+    to_encode["sub"] = str(to_encode["sub"])
     expire = datetime.now(timezone.utc) + timedelta(days=7)
     to_encode.update({"exp": expire, "type": "refresh"})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
