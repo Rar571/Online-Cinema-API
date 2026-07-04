@@ -4,7 +4,8 @@ from unittest.mock import patch, AsyncMock, MagicMock
 import pytest
 from datetime import datetime, timezone, timedelta
 
-from dependencies.authorization import group_admins_id, group_users_id, group_moderators_id
+from dependencies.authorization import group_admins_id, group_users_id, group_moderators_id, require_admin
+from main import app
 from security.passwords import hash_password
 from security.token import generate_access_token, generate_refresh_token
 
@@ -134,23 +135,27 @@ async def test_activation_token_unused(client, mock_db):
 async def test_activate_user_success(client, mock_db):
     token = secrets.token_urlsafe(32)
     mock_user = MagicMock(id=1, is_active=False, email="test@test.com")
-    mock_token = MagicMock(token=token, expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc), user_id=1)
+    mock_token = MagicMock(
+        id=1,
+        token=token,
+        expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc),
+        user_id=1,
+    )
     mock_db.execute.side_effect = [
         AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_user)),
-        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_token))
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_token)),
     ]
     mock_db.delete = AsyncMock()
     mock_db.commit = AsyncMock()
+
     response = await client.get(
-        "/users/activate/",
-        params={
-            "email": "test@test.com",
-            "token": token
-        }
+        f"/users/activate/{mock_token.id}/",
+        params={"email": "test@test.com"},
     )
+
+    assert response.status_code == 200
     mock_db.delete.assert_called_once_with(mock_token)
     mock_db.commit.assert_called_once()
-    assert response.status_code == 200
     assert mock_user.is_active is True
 
 
@@ -163,12 +168,10 @@ async def test_activate_user_token_is_invalid(client, mock_db):
         AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_token))
     ]
     response = await client.get(
-        "/users/activate/",
-        params={
-            "email": "test@test.com",
-            "token": "invalid_token"
-        }
+        f"/users/activate/{mock_token.id}/",
+        params={"email": "test@test.com"},
     )
+
     assert response.status_code == 401
 
 
@@ -176,74 +179,62 @@ async def test_activate_user_token_is_invalid(client, mock_db):
 async def test_activate_user_is_already_active(client, mock_db):
     token = secrets.token_urlsafe(32)
     mock_user = MagicMock(id=1, is_active=True, email="test@email.com")
-    mock_token = MagicMock(token=token, expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc))
+    mock_token = MagicMock(id=1, token=token, user_id=1, expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc))
     mock_db.execute.side_effect = [
         AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_user)),
         AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_token))
     ]
     mock_db.delete = AsyncMock()
     response = await client.get(
-        "/users/activate/",
-        params={
-            "email": "test@test.com",
-            "token": token
-        }
+        f"/users/activate/{mock_token.id}/",
+        params={"email": "test@test.com"},
     )
+
     mock_db.delete.assert_called_once_with(mock_token)
     assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_login_success(client, mock_db):
-    hashed_password = hash_password("Strongpassword123")
-    mock_user = MagicMock(id=1, email="test@test.com", hashed_password=hashed_password, is_active=True)
+    hashed_password = hash_password("Strongpassword123!")
+    mock_user = MagicMock(
+        id=1, email="test@test.com", _hashed_password=hashed_password, is_active=True
+    )
     mock_db.execute.return_value.scalar_one_or_none.return_value = mock_user
     mock_db.add = MagicMock()
     mock_db.commit = AsyncMock()
-    response = await client.request(
-        "GET",
+    response = await client.post(
         "/users/login/",
-        json={
-            "email": "test@test.com",
-            "password": "Strongpassword123"
-        }
+        json={"email": "test@test.com", "password": "Strongpassword123!"},
     )
+    assert response.status_code == 200
     mock_db.add.assert_called_once()
     mock_db.commit.assert_called_once()
-    assert response.status_code == 200
-    assert "access_token" in response.json()
-    assert "refresh_token" in response.json()
-
+    data = response.json()
+    assert "access token" in data
+    assert "refresh token" in data
 
 
 @pytest.mark.asyncio
 async def test_login_invalid_password(client, mock_db):
-    hashed_password = hash_password("Strongpassword123")
-    mock_user = MagicMock(id=1, hashed_password=hashed_password, is_active=True)
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=mock_user)
-    mock_db.commit = AsyncMock()
-    response = await client.get(
+    hashed_password = hash_password("Strongpassword123!")
+    mock_user = MagicMock(id=1, _hashed_password=hashed_password, is_active=True)
+    mock_db.execute.return_value.scalar_one_or_none.return_value = mock_user
+    response = await client.post(
         "/users/login/",
-        params={
-            "email": "test@test.com",
-            "password": "invalid_password"
-        }
+        json={"email": "test@test.com", "password": "invalid_password"},
     )
-    assert response.status_code == 401
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio
 async def test_login_user_is_not_active(client, mock_db):
-    hashed_password = hash_password("Strongpassword123")
-    mock_user = MagicMock(id=1, hashed_password=hashed_password, is_active=False)
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=mock_user)
-    mock_db.commit = AsyncMock()
-    response = await client.get(
+    hashed_password = hash_password("Strongpassword123!")
+    mock_user = MagicMock(id=1, _hashed_password=hashed_password, is_active=False)
+    mock_db.execute.return_value.scalar_one_or_none.return_value = mock_user
+    response = await client.post(
         "/users/login/",
-        params={
-            "email": "test@test.com",
-            "password": "Strongpassword123"
-        }
+        json={"email": "test@test.com", "password": "Strongpassword123!"},
     )
     assert response.status_code == 403
 
@@ -254,13 +245,13 @@ async def test_logout_success(client, mock_db):
     access_token = generate_access_token({"sub": mock_user.id})
     refresh_token = generate_refresh_token({"sub": mock_user.id})
     expiration_date = datetime.now(timezone.utc) + timedelta(days=7)
-    mock_refresh_token = MagicMock(token=refresh_token, user_id=mock_user.id, expires_at=expiration_date)
-    mock_user.refresh_token = mock_refresh_token
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=mock_refresh_token)
+    mock_refresh_token = MagicMock(
+        token=refresh_token, user_id=mock_user.id, expires_at=expiration_date
+    )
+    mock_db.execute.return_value.scalar_one_or_none.return_value = mock_refresh_token
     mock_db.commit = AsyncMock()
     response = await client.post(
-        "/users/logout/",
-        headers={"Authorization": f"Bearer {access_token}"}
+        "/users/logout/", headers={"Authorization": f"Bearer {access_token}"}
     )
     mock_db.delete.assert_called_once_with(mock_refresh_token)
     mock_db.commit.assert_called_once()
@@ -269,18 +260,14 @@ async def test_logout_success(client, mock_db):
 
 @pytest.mark.asyncio
 async def test_logout_not_headers(client, mock_db):
-    response = await client.post(
-        "/users/logout/",
-        headers={}
-    )
+    response = await client.post("/users/logout/", headers={})
     assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_logout_invalid_headers(client, mock_db):
     response = await client.post(
-        "/users/logout/",
-        headers={"Authorization": "invalid_bearer"}
+        "/users/logout/", headers={"Authorization": "invalid_bearer"}
     )
     assert response.status_code == 401
 
@@ -290,90 +277,70 @@ async def test_logout_user_unauthorized(client, mock_db):
     access_token = "invalid_token"
     with patch("security.token.decode_token", side_effect=ValueError()):
         response = await client.post(
-            "/users/logout/",
-            headers={"Authorization": f"Bearer {access_token}"}
+            "/users/logout/", headers={"Authorization": f"Bearer {access_token}"}
         )
         assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_change_user_password_success(client, mock_db):
-    old_password = "Strongpassword123"
+    old_password = "Strongpassword123!"
     mock_user = MagicMock(id=1, is_active=True, hashed_password=hash_password(old_password))
     access_token = generate_access_token({"sub": mock_user.id})
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=mock_user)
+    mock_db.execute.return_value.scalar_one_or_none.return_value = mock_user
     mock_db.commit = AsyncMock()
     response = await client.post(
         "/users/change-password/",
         headers={"Authorization": f"Bearer {access_token}"},
-        json={
-            "old_password": old_password,
-            "new_password": "Newstrongpassword123"
-        }
+        json={"old_password": old_password, "new_password": "Newstrongpassword123!!"},
     )
     mock_db.commit.assert_called_once()
     assert response.status_code == 200
 
 
-
 @pytest.mark.asyncio
 async def test_change_user_password_not_headers(client, mock_db):
-    old_password = "Strongpassword123"
     response = await client.post(
         "/users/change-password/",
         headers={},
-        json={
-            "old_password": old_password,
-            "new_password": "Newstrongpassword123"
-        }
+        json={"old_password": "Strongpassword123!", "new_password": "Newstrongpassword123!!"},
     )
     assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_change_user_password_invalid_headers(client, mock_db):
-    old_password = "Strongpassword123"
     response = await client.post(
         "/users/change-password/",
         headers={"Authorization": "invalid_bearer"},
-        json={
-            "old_password": old_password,
-            "new_password": "Newstrongpassword123"
-        }
+        json={"old_password": "Strongpassword123!", "new_password": "Newstrongpassword123!!"},
     )
     assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_change_user_password_unauthorized(client, mock_db):
-    old_password = "Strongpassword123"
     access_token = "invalid_token"
     with patch("security.token.decode_token", side_effect=ValueError()):
         response = await client.post(
             "/users/change-password/",
             headers={"Authorization": f"Bearer {access_token}"},
-            json={
-                "old_password": old_password,
-                "new_password": "Newstrongpassword123"
-            }
+            json={"old_password": "Strongpassword123!", "new_password": "Newstrongpassword123!!"},
         )
         assert response.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_change_password_invalid_old_password(client, mock_db):
-    old_password = "Strongpassword"
+    old_password = "Strongpassword123!"
     mock_user = MagicMock(id=1, is_active=True, hashed_password=hash_password(old_password))
     access_token = generate_access_token({"sub": mock_user.id})
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=mock_user)
+    mock_db.execute.return_value.scalar_one_or_none.return_value = mock_user
     with patch("security.passwords.verify_password", return_value=False):
         response = await client.post(
             "/users/change-password/",
             headers={"Authorization": f"Bearer {access_token}"},
-            json={
-                "old_password": old_password,
-                "new_password": "Newstrongpassword123"
-            }
+            json={"old_password": old_password, "new_password": "Newstrongpassword123!!"},
         )
     assert response.status_code == 400
 
@@ -384,16 +351,12 @@ async def test_reset_password_request_success(client, mock_db):
     mock_user = MagicMock(id=1, is_active=True)
     mock_db.execute.side_effect = [
         AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_user)),
-        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_reset_token))
+        AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_reset_token)),
     ]
-    mock_db.delete = AsyncMock()
     mock_db.commit = AsyncMock()
     with patch("tasks.celery.send_email.delay") as mock_send_email:
         response = await client.post(
-            "/users/reset-password-request/",
-            json={
-                "email": "test@test.com"
-            }
+            "/users/reset-password-request/", json={"email": "test@test.com"}
         )
         mock_send_email.assert_called_once()
         mock_db.delete.assert_called_once_with(mock_reset_token)
@@ -404,13 +367,10 @@ async def test_reset_password_request_success(client, mock_db):
 @pytest.mark.asyncio
 async def test_reset_password_request_user_not_active(client, mock_db):
     mock_user = MagicMock(id=1, is_active=False)
-    with patch("users.service.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
+    with patch("dependencies.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
         mock_get_user.return_value = mock_user
         response = await client.post(
-            "/users/reset-password-request/",
-            json={
-                "email": "test@test.com"
-            }
+            "/users/reset-password-request/", json={"email": "test@test.com"}
         )
         assert response.status_code == 400
 
@@ -419,19 +379,17 @@ async def test_reset_password_request_user_not_active(client, mock_db):
 async def test_reset_password_complete_success(client, mock_db):
     token = secrets.token_urlsafe(32)
     mock_user = MagicMock(id=1, is_active=True)
-    mock_reset_password_token = MagicMock(token=token, user_id=mock_user.id, expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc))
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=mock_reset_password_token)
-    mock_db.delete = AsyncMock()
+    mock_reset_password_token = MagicMock(
+        token=token, user_id=mock_user.id, expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc)
+    )
+    mock_db.execute.return_value.scalar_one_or_none.return_value = mock_reset_password_token
     mock_db.commit = AsyncMock()
-    with patch("users.service.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
+    with patch("dependencies.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
         mock_get_user.return_value = mock_user
         response = await client.post(
             "/users/reset-password-complete/",
-            json={
-                "email": "test@test.com",
-                "new_password": "Newstrongpassword123",
-                "token": mock_reset_password_token.token
-            }
+            params={"token": token},
+            json={"email": "test@test.com", "new_password": "Newstrongpassword123!"},
         )
         mock_db.delete.assert_called_once_with(mock_reset_password_token)
         mock_db.commit.assert_called_once()
@@ -441,17 +399,13 @@ async def test_reset_password_complete_success(client, mock_db):
 @pytest.mark.asyncio
 async def test_reset_password_complete_not_token(client, mock_db):
     mock_user = MagicMock(id=1, is_active=True)
-    mock_reset_password_token = MagicMock(user_id=mock_user.id, expires_at=datetime(2099, 1, 1, tzinfo=timezone.utc))
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=None)
-    with patch("users.service.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
+    mock_db.execute.return_value.scalar_one_or_none.return_value = None
+    with patch("dependencies.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
         mock_get_user.return_value = mock_user
         response = await client.post(
             "/users/reset-password-complete/",
-            json={
-                "email": "test@test.com",
-                "new_password": "Newstrongpassword123",
-                "token": "invalid_token"
-            }
+            params={"token": "invalid_token"},
+            json={"email": "test@test.com", "new_password": "Newstrongpassword123!"},
         )
         assert response.status_code == 401
 
@@ -461,17 +415,16 @@ async def test_reset_password_complete_token_is_expired(client, mock_db):
     token = secrets.token_urlsafe(32)
     mock_user = MagicMock(id=1, is_active=True)
     expiration_date = datetime.now(timezone.utc) - timedelta(days=1)
-    mock_password_reset_token = MagicMock(token=token, user_id=mock_user.id, expires_at=expiration_date)
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=mock_password_reset_token)
-    with patch("users.service.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
+    mock_password_reset_token = MagicMock(
+        token=token, user_id=mock_user.id, expires_at=expiration_date
+    )
+    mock_db.execute.return_value.scalar_one_or_none.return_value = mock_password_reset_token
+    with patch("dependencies.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
         mock_get_user.return_value = mock_user
         response = await client.post(
             "/users/reset-password-complete/",
-            json={
-                "email": "test@test.com",
-                "new_password": "Newstrongpassword123",
-                "token": mock_password_reset_token.token
-            }
+            params={"token": token},
+            json={"email": "test@test.com", "new_password": "Newstrongpassword123!"},
         )
         assert response.status_code == 401
 
@@ -480,17 +433,19 @@ async def test_reset_password_complete_token_is_expired(client, mock_db):
 async def test_refresh_access_token_success(client, mock_db):
     mock_user = MagicMock(id=1, is_active=True)
     expiration_date = datetime.now(timezone.utc) + timedelta(days=7)
-    mock_refresh_token = MagicMock(token=generate_refresh_token({"sub": mock_user.id}), user_id=mock_user.id, expires_at=expiration_date)
-    mock_db.delete = AsyncMock()
-    mock_db.add = AsyncMock()
+    mock_refresh_token = MagicMock(
+        token=generate_refresh_token({"sub": mock_user.id}),
+        user_id=mock_user.id,
+        expires_at=expiration_date,
+    )
+    mock_db.add = MagicMock()
     mock_db.commit = AsyncMock()
     mock_db.refresh = AsyncMock()
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=mock_refresh_token)
+    mock_db.execute.return_value.scalar_one_or_none.return_value = mock_refresh_token
     with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get_user:
         mock_get_user.return_value = mock_user
         response = await client.post(
-            "/users/refresh-access-token/",
-            json={"refresh_token": mock_refresh_token.token}
+            "/users/refresh-access-token/", json={"refresh_token": mock_refresh_token.token}
         )
         mock_db.delete.assert_called_once_with(mock_refresh_token)
         mock_db.add.assert_called_once()
@@ -501,11 +456,9 @@ async def test_refresh_access_token_success(client, mock_db):
 
 @pytest.mark.asyncio
 async def test_refresh_access_token_not_token(client, mock_db):
-    mock_user = MagicMock(id=1, is_active=True)
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=None)
+    mock_db.execute.return_value.scalar_one_or_none.return_value = None
     response = await client.post(
-        "/users/refresh-access-token/",
-        json={"refresh_token": "invalid_token"}
+        "/users/refresh-access-token/", json={"refresh_token": "invalid_token"}
     )
     assert response.status_code == 401
 
@@ -514,11 +467,14 @@ async def test_refresh_access_token_not_token(client, mock_db):
 async def test_refresh_access_token_is_expired(client, mock_db):
     mock_user = MagicMock(id=1, is_active=True)
     expiration_date = datetime.now(timezone.utc) - timedelta(days=1)
-    mock_refresh_token = MagicMock(token=generate_refresh_token({"sub": mock_user.id}), user_id=mock_user.id, expires_at=expiration_date)
-    mock_db.execute.return_value.scalar_one_or_none = AsyncMock(return_value=mock_refresh_token)
+    mock_refresh_token = MagicMock(
+        token=generate_refresh_token({"sub": mock_user.id}),
+        user_id=mock_user.id,
+        expires_at=expiration_date,
+    )
+    mock_db.execute.return_value.scalar_one_or_none.return_value = mock_refresh_token
     response = await client.post(
-        "/users/refresh-access-token/",
-        json={"refresh_token": mock_refresh_token.token}
+        "/users/refresh-access-token/", json={"refresh_token": mock_refresh_token.token}
     )
     assert response.status_code == 401
 
@@ -527,166 +483,126 @@ async def test_refresh_access_token_is_expired(client, mock_db):
 async def test_make_admin_success(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, group_id=group_users_id)
-
-    with patch("dependencies.authorization.require_admin", new_callable=AsyncMock) as mock_require:
-        mock_require.return_value = mock_admin
-        with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_user
-            mock_db.commit = AsyncMock()
-
-            response = await client.post("/users/2/make-admin/")
-
-            assert response.status_code == 200
-            assert mock_user.group_id == group_admins_id
-            mock_db.commit.assert_called_once()
+    app.dependency_overrides[require_admin] = lambda: mock_admin
+    mock_db.commit = AsyncMock()
+    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_user
+        response = await client.patch("/users/2/make-admin/")
+    assert response.status_code == 200
+    assert mock_user.group_id == group_admins_id
+    mock_db.commit.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_make_admin_own_group(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
-
-    with patch("dependencies.authorization.require_admin", new_callable=AsyncMock) as mock_require:
-        mock_require.return_value = mock_admin
-        with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_admin
-
-            response = await client.post("/users/1/make-admin/")
-
-            assert response.status_code == 400
+    app.dependency_overrides[require_admin] = lambda: mock_admin
+    response = await client.patch("/users/1/make-admin/")
+    assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_make_admin_already_admin(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, group_id=group_admins_id)
-
-    with patch("dependencies.authorization.require_admin", new_callable=AsyncMock) as mock_require:
-        mock_require.return_value = mock_admin
-        with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_user
-
-            response = await client.post("/users/2/make-admin/")
-
-            assert response.status_code == 400
+    app.dependency_overrides[require_admin] = lambda: mock_admin
+    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_user
+        response = await client.patch("/users/2/make-admin/")
+    assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_make_moderator_success(client, mock_db):
-    mock_moderator = MagicMock(id=1, group_id=group_admins_id)
+    mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, group_id=group_users_id)
-
-    with patch("dependencies.authorization.require_admin", new_callable=AsyncMock) as mock_require:
-        mock_require.return_value = mock_moderator
-        with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_user
-            mock_db.commit = AsyncMock()
-
-            response = await client.post("/users/2/make-moderator/")
-
-            assert response.status_code == 200
-            assert mock_user.group_id == group_moderators_id
-            mock_db.commit.assert_called_once()
+    app.dependency_overrides[require_admin] = lambda: mock_admin
+    mock_db.commit = AsyncMock()
+    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_user
+        response = await client.patch("/users/2/make-moderator/")
+    assert response.status_code == 200
+    assert mock_user.group_id == group_moderators_id
+    mock_db.commit.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_make_moderator_own_group(client, mock_db):
-    mock_moderator = MagicMock(id=1, group_id=group_moderators_id)
-
-    with patch("dependencies.authorization.require_admin", new_callable=AsyncMock) as mock_require:
-        mock_require.return_value = mock_moderator
-        with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_moderator
-
-            response = await client.post("/users/1/make-moderator/")
-
-            assert response.status_code == 400
+    mock_admin = MagicMock(id=1, group_id=group_moderators_id)
+    app.dependency_overrides[require_admin] = lambda: mock_admin
+    response = await client.patch("/users/1/make-moderator/")
+    assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_make_moderator_already_moderator(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, group_id=group_moderators_id)
+    app.dependency_overrides[require_admin] = lambda: mock_admin
+    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_user
+        response = await client.patch("/users/2/make-moderator/")
 
-    with patch("dependencies.authorization.require_admin", new_callable=AsyncMock) as mock_require:
-        mock_require.return_value = mock_admin
-        with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_user
-
-            response = await client.post("/users/2/make-moderator/")
-
-            assert response.status_code == 400
+    assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_make_user_success(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, group_id=group_moderators_id)
+    app.dependency_overrides[require_admin] = lambda: mock_admin
+    mock_db.commit = AsyncMock()
+    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_user
+        response = await client.patch("/users/2/make-user/")
 
-    with patch("dependencies.authorization.require_admin", new_callable=AsyncMock) as mock_require:
-        mock_require.return_value = mock_admin
-        with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_user
-            mock_db.commit = AsyncMock()
-
-            response = await client.post("/users/2/make-user/")
-
-            assert response.status_code == 200
-            assert mock_user.group_id == group_users_id
-            mock_db.commit.assert_called_once()
+    assert response.status_code == 200
+    assert mock_user.group_id == group_users_id
+    mock_db.commit.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_make_user_own_group(client, mock_db):
-    mock_admin = MagicMock(id=1, group_id=group_admins_id)
-    mock_user = MagicMock(id=1, group_id=group_users_id)
-
-    with patch("dependencies.authorization.require_admin", new_callable=AsyncMock) as mock_require:
-        mock_require.return_value = mock_admin
-        with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_user
-
-            response = await client.post("/users/1/make-user/")
-
-            assert response.status_code == 400
+    mock_admin = MagicMock(id=1, group_id=group_users_id)
+    app.dependency_overrides[require_admin] = lambda: mock_admin
+    response = await client.patch("/users/1/make-user/")
+    assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_make_user_already_user(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, group_id=group_users_id)
+    app.dependency_overrides[require_admin] = lambda: mock_admin
+    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_user
+        response = await client.patch("/users/2/make-user/")
 
-    with patch("dependencies.authorization.require_admin", new_callable=AsyncMock) as mock_require:
-        mock_require.return_value = mock_admin
-        with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_user
-
-            response = await client.post("/users/2/make-user/")
-
-            assert response.status_code == 400
+    assert response.status_code == 400
 
 
 @pytest.mark.asyncio
 async def test_activate_user_by_id_success(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, is_active=False)
-    with patch("dependencies.authorization.require_admin", new_callable=AsyncMock) as mock_require:
-        mock_require.return_value = mock_admin
-        with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_user
-            mock_db.commit = AsyncMock()
-            response = await client.post("/users/2/activate_user/")
-            mock_db.commit.assert_called_once()
-            assert mock_user.is_active == True
-            assert response.status_code == 200
+    app.dependency_overrides[require_admin] = lambda: mock_admin
+    mock_db.commit = AsyncMock()
+    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_user
+        response = await client.patch("/users/2/activate_user/")
+
+    assert response.status_code == 200
+    assert mock_user.is_active is True
+    mock_db.commit.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_activate_user_by_id_already_activated(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, is_active=True)
-    with patch("dependencies.authorization.require_admin", new_callable=AsyncMock) as mock_require:
-        mock_require.return_value = mock_admin
-        with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
-            mock_get.return_value = mock_user
-            response = await client.post("/users/2/activate_user/")
-            assert response.status_code == 400
+    app.dependency_overrides[require_admin] = lambda: mock_admin
+    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+        mock_get.return_value = mock_user
+        response = await client.patch("/users/2/activate_user/")
+
+    assert response.status_code == 400

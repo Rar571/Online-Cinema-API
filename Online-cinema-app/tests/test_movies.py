@@ -10,27 +10,31 @@ from decimal import Decimal
 
 @pytest.mark.asyncio
 async def test_get_movies_success(client, mock_db):
-    mock_movie = {
-        "id": 1,
-        "uuid": "desfaefewfew",
-        "name": "Test movie",
-        "year": 2089,
-        "time": 80,
-        "imdb": 9.4,
-        "votes": 9,
-        "description": "Test description",
-        "price": Decimal("7.90"),
-        "certification_id": 1,
-    }
+    mock_movie_details = MagicMock(
+        id=1,
+        uuid="desfaefewfew",
+        year=2024,
+        time=80,
+        imdb=9.4,
+        votes=9,
+        description="Test description",
+        price=Decimal("7.90"),
+        certification_id=1,
+    )
+    mock_movie_details.name = "test"
+
+    count_result = MagicMock()
+    count_result.scalar.return_value = 1
+    mock_db.execute.return_value = count_result
 
     with patch("crud.movies.filter_sort_search_movies", new_callable=AsyncMock) as mock_filter:
-        mock_filter.return_value = [mock_movie]
+        mock_filter.return_value = [mock_movie_details]
 
         response = await client.get("/movies/")
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
-        assert "total" in data
+        assert data["total"] == 1
         assert "page" in data
         assert "limit" in data
 
@@ -184,47 +188,57 @@ async def test_like_or_dislike_movie_not_found(client, mock_db):
 
 @pytest.mark.asyncio
 async def test_list_favorite_movies_success(client, mock_db):
-    mock_movie = {
-        "id": 1,
-        "uuid": "desfaefewfew",
-        "name": "Test movie",
-        "year": 2024,
-        "time": 80,
-        "imdb": 9.4,
-        "votes": 9,
-        "description": "Test description",
-        "price": Decimal("7.90"),
-        "certification_id": 1,
-    }
+    mock_movie_details = MagicMock(
+        id=1,
+        uuid="desfaefewfew",
+        year=2024,
+        time=80,
+        imdb=9.4,
+        votes=9,
+        description="Test description",
+        price=Decimal("7.90"),
+        certification_id=1,
+    )
+    mock_movie_details.name = "test"
+    mock_favorite_movie = MagicMock(id=1, user_id=3, movie_id=1, movie=mock_movie_details)
+
+    count_result = MagicMock()
+    count_result.scalar.return_value = 1
+    mock_db.execute.return_value = count_result
+
     with patch("crud.movies.filter_sort_search_movies", new_callable=AsyncMock) as mock_filter:
-        mock_filter.return_value = [mock_movie]
-        response = await client.get(
-            "/movies/favorites/"
-        )
+        mock_filter.return_value = [mock_favorite_movie]
+        response = await client.get("/movies/favorites/")
         assert response.status_code == 200
         data = response.json()
         assert "items" in data
-        assert "total" in data
+        assert data["total"] == 1
         assert "page" in data
         assert "limit" in data
 
 
 @pytest.mark.asyncio
 async def test_list_favorite_movies_with_filters(client, mock_db):
-    mock_movie = {
-        "id": 1,
-        "uuid": "desfaefewfew",
-        "name": "test",
-        "year": 2024,
-        "time": 80,
-        "imdb": 9.4,
-        "votes": 9,
-        "description": "Test description",
-        "price": Decimal("7.90"),
-        "certification_id": 1,
-    }
+    mock_movie_details = MagicMock(
+        id=1,
+        uuid="desfaefewfew",
+        year=2024,
+        time=80,
+        imdb=9.4,
+        votes=9,
+        description="Test description",
+        price=Decimal("7.90"),
+        certification_id=1,
+    )
+    mock_movie_details.name = "test"
+    mock_favorite_movie = MagicMock(movie=mock_movie_details)
+
+    count_result = MagicMock()
+    count_result.scalar.return_value = 1
+    mock_db.execute.return_value = count_result
+
     with patch("crud.movies.filter_sort_search_movies", new_callable=AsyncMock) as mock_filter:
-        mock_filter.return_value = [mock_movie]
+        mock_filter.return_value = [mock_favorite_movie]
         response = await client.get(
             "/movies/favorites/?name=test&year=2024&page=2&limit=5"
         )
