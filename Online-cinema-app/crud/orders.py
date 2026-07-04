@@ -63,7 +63,7 @@ async def cancel_order_if_not_paid(
             OrderModel.status == OrderStatusEnum.PENDING,
         )
     )
-    order = order_result.one_or_none()
+    order = order_result.scalar_one_or_none()
     if not order:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
@@ -83,7 +83,7 @@ async def refund_request(order_id: int, db: AsyncSession, current_user: UserMode
             OrderModel.status == OrderStatusEnum.PAID,
         )
     )
-    order = order_result.one_or_none()
+    order = order_result.scalar_one_or_none()
     if not order:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -96,7 +96,7 @@ async def refund_request(order_id: int, db: AsyncSession, current_user: UserMode
             PaymentModel.user_id == current_user.id,
         )
     )
-    payment = payment_result.one_or_none()
+    payment = payment_result.scalar_one_or_none()
     if not payment:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found"
