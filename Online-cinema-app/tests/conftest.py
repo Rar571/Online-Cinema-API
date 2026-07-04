@@ -10,6 +10,9 @@ from dependencies.authorization import require_moderator, group_moderators_id, g
 from dependencies.users import get_current_user_model
 from main import app
 from db.session_postgresql import get_db
+import dependencies.authorization as auth_module
+import routes.users as users_router_module
+import tests.test_users as test_users_module
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 
@@ -49,6 +52,22 @@ async def client(mock_db):
         yield ac
 
     app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def set_group_ids():
+    auth_module.group_admins_id = 1
+    auth_module.group_moderators_id = 2
+    auth_module.group_users_id = 3
+
+    users_router_module.group_admins_id = 1
+    users_router_module.group_moderators_id = 2
+    users_router_module.group_users_id = 3
+
+    test_users_module.group_admins_id = 1
+    test_users_module.group_moderators_id = 2
+    test_users_module.group_users_id = 3
+    yield
 
 
 @pytest.fixture
