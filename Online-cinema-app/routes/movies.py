@@ -284,7 +284,7 @@ async def genre_detail(genre_id: int, db: AsyncSession = Depends(get_db)):
     return await detail_genre(genre_id=genre_id, db=db)
 
 
-@movies_router.patch("/genres/{genre_id}/", status_code=status.HTTP_200_OK)
+@movies_router.put("/genres/{genre_id}/", status_code=status.HTTP_200_OK)
 async def genre_update(
     genre_id: int,
     genre_data: GenreSchema,
@@ -331,7 +331,7 @@ async def star_detail(
     return await detail_actor(actor_id=star_id, db=db)
 
 
-@movies_router.patch("/stars/{star_id}/", status_code=status.HTTP_200_OK)
+@movies_router.put("/stars/{star_id}/", status_code=status.HTTP_200_OK)
 async def update_star(
     star_id: int,
     star_data: StarUpdateSchema,
