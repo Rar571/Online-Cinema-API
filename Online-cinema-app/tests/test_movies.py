@@ -81,7 +81,7 @@ async def test_delete_movie_not_found(client, mock_db):
 @pytest.mark.asyncio
 async def test_delete_movie_is_already_purchased(client, mock_db):
     mock_movie = MagicMock(id=1)
-    purchased_movie = MagicMock()
+    purchased_movie = MagicMock(id=1, movie_id=1)
     mock_db.execute.side_effect = [
         AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_movie)),
         AsyncMock(scalar_one_or_none=MagicMock(return_value=purchased_movie)),
@@ -101,7 +101,7 @@ async def test_like_or_dislike_success(client, mock_db):
         AsyncMock(scalar_one_or_none=MagicMock(return_value=None)),
         AsyncMock(scalar=MagicMock(return_value=total_movie_likes))
     ]
-    mock_db.add = AsyncMock()
+    mock_db.add = MagicMock()
     mock_db.commit = AsyncMock()
     response = await client.post(
         "/movies/1/like/",
@@ -238,7 +238,7 @@ async def test_add_favorite_movie_success(client, mock_db):
         AsyncMock(scalar_one_or_none=MagicMock(return_value=mock_movie)),
         AsyncMock(scalar_one_or_none=MagicMock(return_value=None))
     ]
-    mock_db.add = AsyncMock()
+    mock_db.add = MagicMock()
     mock_db.commit = AsyncMock()
     response = await client.post(
         "/movies/favorites/",
@@ -246,7 +246,7 @@ async def test_add_favorite_movie_success(client, mock_db):
             "movie_id": 1
         }
     )
-    mock_db.add.assert_called_once()
+    mock_db.add.assert_called_once_with(mock_new_favorite_movie)
     mock_db.commit.assert_called_once()
     assert response.status_code == 201
 
