@@ -176,7 +176,7 @@ class LikeAndDislikeModel(Base):
     )
 
 
-class FavoriteMovieModel(MovieModel):
+class FavoriteMovieModel(Base):
     __tablename__ = "favorites"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
