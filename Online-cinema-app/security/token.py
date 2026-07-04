@@ -33,7 +33,7 @@ def generate_refresh_token(data: dict):
 def decode_token(token: str) -> int:
     # returns user id or ValueError
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithm=ALGORITHM)
+        payload = jwt.decode(token, SECRET_KEY, algorithms=ALGORITHM)
         user_id = int(payload.get("sub"))
         return user_id
     except ExpiredSignatureError:
