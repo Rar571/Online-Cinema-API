@@ -249,10 +249,12 @@ async def test_logout_success(client, mock_db):
         token=refresh_token, user_id=mock_user.id, expires_at=expiration_date
     )
     mock_db.execute.return_value.scalar_one_or_none.return_value = mock_refresh_token
+    mock_db.delete = AsyncMock()
     mock_db.commit = AsyncMock()
     response = await client.post(
         "/users/logout/", headers={"Authorization": f"Bearer {access_token}"}
     )
+    print(response.json())
     mock_db.delete.assert_called_once_with(mock_refresh_token)
     mock_db.commit.assert_called_once()
     assert response.status_code == 200
@@ -294,6 +296,7 @@ async def test_change_user_password_success(client, mock_db):
         headers={"Authorization": f"Bearer {access_token}"},
         json={"old_password": old_password, "new_password": "Newstrongpassword123!!"},
     )
+    print(response.json())
     mock_db.commit.assert_called_once()
     assert response.status_code == 200
 
@@ -367,7 +370,7 @@ async def test_reset_password_request_success(client, mock_db):
 @pytest.mark.asyncio
 async def test_reset_password_request_user_not_active(client, mock_db):
     mock_user = MagicMock(id=1, is_active=False)
-    with patch("dependencies.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
+    with patch("routes.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
         mock_get_user.return_value = mock_user
         response = await client.post(
             "/users/reset-password-request/", json={"email": "test@test.com"}
@@ -384,7 +387,7 @@ async def test_reset_password_complete_success(client, mock_db):
     )
     mock_db.execute.return_value.scalar_one_or_none.return_value = mock_reset_password_token
     mock_db.commit = AsyncMock()
-    with patch("dependencies.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
+    with patch("routes.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
         mock_get_user.return_value = mock_user
         response = await client.post(
             "/users/reset-password-complete/",
@@ -400,7 +403,7 @@ async def test_reset_password_complete_success(client, mock_db):
 async def test_reset_password_complete_not_token(client, mock_db):
     mock_user = MagicMock(id=1, is_active=True)
     mock_db.execute.return_value.scalar_one_or_none.return_value = None
-    with patch("dependencies.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
+    with patch("routes.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
         mock_get_user.return_value = mock_user
         response = await client.post(
             "/users/reset-password-complete/",
@@ -419,7 +422,7 @@ async def test_reset_password_complete_token_is_expired(client, mock_db):
         token=token, user_id=mock_user.id, expires_at=expiration_date
     )
     mock_db.execute.return_value.scalar_one_or_none.return_value = mock_password_reset_token
-    with patch("dependencies.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
+    with patch("routes.users.get_user_by_email", new_callable=AsyncMock) as mock_get_user:
         mock_get_user.return_value = mock_user
         response = await client.post(
             "/users/reset-password-complete/",
@@ -442,7 +445,7 @@ async def test_refresh_access_token_success(client, mock_db):
     mock_db.commit = AsyncMock()
     mock_db.refresh = AsyncMock()
     mock_db.execute.return_value.scalar_one_or_none.return_value = mock_refresh_token
-    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get_user:
+    with patch("routes.users.get_user_by_id", new_callable=AsyncMock) as mock_get_user:
         mock_get_user.return_value = mock_user
         response = await client.post(
             "/users/refresh-access-token/", json={"refresh_token": mock_refresh_token.token}
@@ -485,7 +488,7 @@ async def test_make_admin_success(client, mock_db):
     mock_user = MagicMock(id=2, group_id=group_users_id)
     app.dependency_overrides[require_admin] = lambda: mock_admin
     mock_db.commit = AsyncMock()
-    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+    with patch("routes.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_user
         response = await client.patch("/users/2/make-admin/")
     assert response.status_code == 200
@@ -506,7 +509,7 @@ async def test_make_admin_already_admin(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, group_id=group_admins_id)
     app.dependency_overrides[require_admin] = lambda: mock_admin
-    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+    with patch("routes.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_user
         response = await client.patch("/users/2/make-admin/")
     assert response.status_code == 400
@@ -518,7 +521,7 @@ async def test_make_moderator_success(client, mock_db):
     mock_user = MagicMock(id=2, group_id=group_users_id)
     app.dependency_overrides[require_admin] = lambda: mock_admin
     mock_db.commit = AsyncMock()
-    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+    with patch("routes.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_user
         response = await client.patch("/users/2/make-moderator/")
     assert response.status_code == 200
@@ -539,7 +542,7 @@ async def test_make_moderator_already_moderator(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, group_id=group_moderators_id)
     app.dependency_overrides[require_admin] = lambda: mock_admin
-    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+    with patch("routes.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_user
         response = await client.patch("/users/2/make-moderator/")
 
@@ -552,7 +555,7 @@ async def test_make_user_success(client, mock_db):
     mock_user = MagicMock(id=2, group_id=group_moderators_id)
     app.dependency_overrides[require_admin] = lambda: mock_admin
     mock_db.commit = AsyncMock()
-    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+    with patch("routes.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_user
         response = await client.patch("/users/2/make-user/")
 
@@ -574,7 +577,7 @@ async def test_make_user_already_user(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, group_id=group_users_id)
     app.dependency_overrides[require_admin] = lambda: mock_admin
-    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+    with patch("routes.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_user
         response = await client.patch("/users/2/make-user/")
 
@@ -587,7 +590,7 @@ async def test_activate_user_by_id_success(client, mock_db):
     mock_user = MagicMock(id=2, is_active=False)
     app.dependency_overrides[require_admin] = lambda: mock_admin
     mock_db.commit = AsyncMock()
-    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+    with patch("routes.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_user
         response = await client.patch("/users/2/activate_user/")
 
@@ -601,7 +604,7 @@ async def test_activate_user_by_id_already_activated(client, mock_db):
     mock_admin = MagicMock(id=1, group_id=group_admins_id)
     mock_user = MagicMock(id=2, is_active=True)
     app.dependency_overrides[require_admin] = lambda: mock_admin
-    with patch("dependencies.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
+    with patch("routes.users.get_user_by_id", new_callable=AsyncMock) as mock_get:
         mock_get.return_value = mock_user
         response = await client.patch("/users/2/activate_user/")
 

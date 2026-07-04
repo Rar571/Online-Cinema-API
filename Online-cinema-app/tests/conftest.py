@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock, MagicMock
@@ -8,6 +10,7 @@ from dependencies.authorization import require_moderator, group_moderators_id, g
 from dependencies.users import get_current_user_model
 from main import app
 from db.session_postgresql import get_db
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
 
 
 @pytest.fixture
