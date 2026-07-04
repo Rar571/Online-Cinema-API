@@ -146,7 +146,7 @@ async def movie_delete(movie_id: int, db: AsyncSession):
     movies_in_cart = await db.execute(
         select(CartItemModel).where(CartItemModel.movie_id == movie.id)
     )
-    movies_in_cart = movies_in_cart.scalars()
+    movies_in_cart = movies_in_cart.scalars().all()
     carts_id = [cart_item.cart_id for cart_item in movies_in_cart]
     if carts_id:
         detail = {"detail": f"Movie is in the user's cart(s) with id: {carts_id}"}
