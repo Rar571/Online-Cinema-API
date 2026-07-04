@@ -19,10 +19,6 @@ class UserRegistrationSchema(UserBaseSchema):
         return password
 
 
-class UserActivationSchema(UserBaseSchema):
-    token: str
-
-
 class UserLoginSchema(UserRegistrationSchema):
     pass
 
@@ -63,8 +59,6 @@ class UserResetPasswordCompleteSchema(UserBaseSchema):
         if error_message:
             raise ValueError(error_message)
         return password
-
-    token: str
 
 
 class UserRefreshAccessTokenSchema(BaseModel):

@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, APIRouter, status, Request
+from fastapi import Depends, HTTPException, APIRouter, status, Request, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,7 +22,6 @@ from models.users import (
 )
 from schemas.users import (
     UserRegistrationSchema,
-    UserActivationSchema,
     UserBaseSchema,
     UserLoginSchema,
     UserChangePasswordSchema,
@@ -66,9 +65,10 @@ async def register_user(
         db.add(activation_token)
         await db.commit()
         await db.refresh(new_user)
+        await db.refresh(activation_token)
         send_email.delay(
             subject="Activation email",
-            body=f"localhost:8000/users/activate?token={activation_token.token}. This link is valid for 24 hours",
+            body=f"localhost:8000/users/activate/{activation_token.id}/?email={new_user.email}. This link is valid for 24 hours",
             receiver_email=user_data.email,
         )
     except Exception as e:
@@ -113,7 +113,7 @@ async def get_new_activation_token(
         await db.refresh(new_token)
         send_email.delay(
             subject="Activation email",
-            body=f"localhost:8000/users/activate?token={new_token.token}. This link is valid for 24 hours",
+            body=f"localhost:8000/users/activate/{new_token.id}/?email={user.email}. This link is valid for 24 hours",
             receiver_email=user.email,
         )
     except Exception:
@@ -129,15 +129,16 @@ async def get_new_activation_token(
     )
 
 
-@users_router.get("/activate/")
+@users_router.get("/activate/{token_id}/")
 async def activate_account(
-    user_data: UserActivationSchema = Depends(), db: AsyncSession = Depends(get_db)
+    token_id: int,
+    db: AsyncSession = Depends(get_db),
+    email: str = Query(...),
 ):
-    user = await get_user_by_email(user_email=user_data.email, db=db)
+    user = await get_user_by_email(user_email=email, db=db)
     result_token = await db.execute(
         select(ActivationTokenModel).where(
-            ActivationTokenModel.user_id == user.id,
-            ActivationTokenModel.token == user_data.token,
+            ActivationTokenModel.user_id == user.id, ActivationTokenModel.id == token_id
         )
     )
     token = result_token.scalar_one_or_none()
@@ -159,7 +160,7 @@ async def activate_account(
     )
 
 
-@users_router.get("/login/")
+@users_router.post("/login/")
 async def user_login(user_data: UserLoginSchema, db: AsyncSession = Depends(get_db)):
     user = await get_user_by_email(user_email=user_data.email, db=db)
     hashed_password = user._hashed_password
@@ -290,7 +291,7 @@ async def reset_user_password_request(
         await db.refresh(reset_password_token)
         send_email.delay(
             subject="Reset Password Email",
-            body=f"Your link to reset old password is: localhost:8000/users/reset-password-complete?token={reset_password_token.token}",
+            body=f"Your link to reset old password is: localhost:8000/users/reset-password-complete/?token={reset_password_token.token}",
             receiver_email=user.email,
         )
     except Exception:
@@ -307,13 +308,15 @@ async def reset_user_password_request(
 
 @users_router.post("/reset-password-complete/")
 async def reset_user_password_complete(
-    user_data: UserResetPasswordCompleteSchema, db: AsyncSession = Depends(get_db)
+    user_data: UserResetPasswordCompleteSchema,
+    db: AsyncSession = Depends(get_db),
+    token: str = Query(...),
 ):
     user = await get_user_by_email(user_email=user_data.email, db=db)
     reset_token_result = await db.execute(
         select(PasswordResetTokenModel).where(
             PasswordResetTokenModel.user_id == user.id,
-            PasswordResetTokenModel.token == user_data.token,
+            PasswordResetTokenModel.token == token,
         )
     )
     reset_token = reset_token_result.scalar_one_or_none()
@@ -373,7 +376,7 @@ async def refresh_user_access_token(
     )
 
 
-@users_router.post("/{user_id}/make-admin/")
+@users_router.patch("/{user_id}/make-admin/")
 async def make_admin(
     user_id: int,
     current_user=Depends(require_admin),
@@ -397,7 +400,7 @@ async def make_admin(
     )
 
 
-@users_router.post("/{user_id}/make-moderator/")
+@users_router.patch("/{user_id}/make-moderator/")
 async def make_moderator(
     user_id: int,
     current_user=Depends(require_admin),
@@ -422,7 +425,7 @@ async def make_moderator(
     )
 
 
-@users_router.post("/{user_id}/make-user/")
+@users_router.patch("/{user_id}/make-user/")
 async def make_user(
     user_id: int,
     current_user=Depends(require_admin),
@@ -447,7 +450,7 @@ async def make_user(
     )
 
 
-@users_router.post("/{user_id}/activate_user/")
+@users_router.patch("/{user_id}/activate_user/")
 async def activate_user_by_id(
     user_id: int,
     current_user=Depends(require_admin),
