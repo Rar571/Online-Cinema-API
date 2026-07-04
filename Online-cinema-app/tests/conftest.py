@@ -34,7 +34,7 @@ async def client(mock_db):
         return MagicMock(id=2, group_id=group_admins_id)
 
     def override_get_current_user_model():
-        return MagicMock(id=3)
+        return MagicMock(id=3, is_active=True)
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[require_moderator] = override_require_moderator
