@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from starlette.responses import JSONResponse
+from fastapi.responses import JSONResponse
 import stripe
 from models.orders import OrderModel, OrderItemModel, OrderStatusEnum
 from models.payments import PaymentModel, StatusEnum

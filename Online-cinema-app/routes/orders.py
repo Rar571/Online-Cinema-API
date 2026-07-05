@@ -22,6 +22,9 @@ async def list_orders(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
+    """
+    Gets orders list for current user.
+    """
     return await view_orders_list(db=db, current_user=current_user)
 
 
@@ -31,6 +34,9 @@ async def cancel_order(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
+    """
+    Cancels an pending order for current user.
+    """
     return await cancel_order_if_not_paid(
         order_id=order_id, db=db, current_user=current_user
     )
@@ -42,6 +48,9 @@ async def refund(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
+    """
+    Refunds payment via stripe refund. Changes order status to 'canceled' and payment status to 'refunded'.
+    """
     return await refund_request(order_id=order_id, db=db, current_user=current_user)
 
 
@@ -53,6 +62,9 @@ async def view_orders_list_for_admin(
     dates: list[datetime] | None = None,
     statuses: list[OrderStatusEnum] | None = None,
 ):
+    """
+    Gets orders list for a specific user with filters (available only for admin).
+    """
     await require_admin(current_user=current_user)
     return await view_users_orders(
         db=db,
