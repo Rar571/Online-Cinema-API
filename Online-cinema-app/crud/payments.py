@@ -19,7 +19,7 @@ async def create_checkout_session(
     order_id: int, db: AsyncSession, current_user: UserModel
 ):
     order_result = await db.execute(select(OrderModel).where(OrderModel.id == order_id))
-    order = order_result.one_or_none()
+    order = order_result.scalar_one_or_none()
     if not order:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Order not found"
@@ -69,7 +69,7 @@ async def stripe_webhook(request: Request, db: AsyncSession):
                 selectinload(OrderModel.user), selectinload(OrderModel.order_items)
             )
         )
-        order = order_result.one_or_none()
+        order = order_result.scalar_one_or_none()
         if not order:
             logger.error(f"Order not found: {order_id}")
             return {"status": "received"}
@@ -106,7 +106,7 @@ async def stripe_webhook(request: Request, db: AsyncSession):
             .where(OrderModel.id == order_id)
             .options(selectinload(OrderModel.user))
         )
-        order = order_result.one_or_none()
+        order = order_result.scalar_one_or_none()
         if not order:
             logger.error(f"Order not found: {order_id}")
             return {"status": "received"}
@@ -124,7 +124,7 @@ async def stripe_webhook(request: Request, db: AsyncSession):
         order_result = await db.execute(
             select(OrderModel).where(OrderModel.id == order_id)
         )
-        order = order_result.one_or_none()
+        order = order_result.scalar_one_or_none()
         if not order:
             logger.error(f"Order not found: {order_id}")
             return {"status": "received"}
