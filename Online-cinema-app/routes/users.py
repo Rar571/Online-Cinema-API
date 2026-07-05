@@ -49,7 +49,10 @@ async def register_user(
         409: Email already exists
         500: Internal error during user creation
     """
-    existing_user = get_user_by_email(user_email=user_data.email, db=db)
+    existing_user_result = await db.execute(
+        select(UserModel).where(UserModel.email == user_data.email)
+    )
+    existing_user = existing_user_result.scalar_one_or_none()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -495,14 +498,14 @@ async def make_moderator(
     db: AsyncSession = Depends(get_db),
 ):
     """
-      Change user group to 'moderator' (available only for admin)
+    Change user group to 'moderator' (available only for admin)
 
-      Returns:
-          200: User group changed to 'moderator'
-          400: User can not change his own group
-          404: User not found
-          400: User is already a moderator
-      """
+    Returns:
+        200: User group changed to 'moderator'
+        400: User can not change his own group
+        404: User not found
+        400: User is already a moderator
+    """
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -529,14 +532,14 @@ async def make_user(
     db: AsyncSession = Depends(get_db),
 ):
     """
-      Change user group to 'user' (available only for admin)
+    Change user group to 'user' (available only for admin)
 
-      Returns:
-          200: User group changed to 'user'
-          400: User can not change his own group
-          404: User not found
-          400: User is already in 'user' group
-      """
+    Returns:
+        200: User group changed to 'user'
+        400: User can not change his own group
+        404: User not found
+        400: User is already in 'user' group
+    """
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
