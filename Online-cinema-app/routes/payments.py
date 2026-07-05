@@ -36,10 +36,9 @@ async def pay_for_order(
 @payment_router.post("/webhook/")
 async def webhook(
     request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: UserModel = Depends(get_current_user_model),
+    db: AsyncSession = Depends(get_db)
 ):
-    return await stripe_webhook(request=request, db=db, current_user=current_user)
+    return await stripe_webhook(request=request, db=db)
 
 
 @payment_router.get("/payments/", status_code=status.HTTP_200_OK)
