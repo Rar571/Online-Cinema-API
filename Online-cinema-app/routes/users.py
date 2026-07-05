@@ -37,15 +37,7 @@ from datetime import datetime, timezone, timedelta
 users_router = APIRouter()
 
 
-@users_router.post(
-    "/register/",
-    status_code=201,
-    responses={
-        201: {"description": "User registered, activation email sent"},
-        409: {"description": "Email already exists"},
-        500: {"description": "Internal error during user creation"},
-    },
-)
+@users_router.post("/register/", status_code=201)
 async def register_user(
     user_data: UserRegistrationSchema, db: AsyncSession = Depends(get_db)
 ):
@@ -92,22 +84,14 @@ async def register_user(
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
             content={
-                "detail": f"User was registered successfully."
+                "detail": f"User was registered successfully. "
                 f"The email with activation token has been "
                 f"already sent to your {user_data.email}"
             },
         )
 
 
-@users_router.post(
-    "/activation_token/",
-    responses={
-        201: {"description": "New activation token created, activation email sent"},
-        404: {"description": "User not found"},
-        400: {"description": "User is already active or old token is still valid"},
-        500: {"description": "Internal error during email sending"},
-    },
-)
+@users_router.post("/activation_token/")
 async def get_new_activation_token(
     user_data: UserBaseSchema, db: AsyncSession = Depends(get_db)
 ):
@@ -153,15 +137,7 @@ async def get_new_activation_token(
     )
 
 
-@users_router.get(
-    "/activate/{token_id}/",
-    responses={
-        200: {"description": "User account activated"},
-        404: {"description": "User not found"},
-        401: {"description": "Token is invalid or expired"},
-        400: {"description": "User is already active or old token is still valid"},
-    },
-)
+@users_router.get("/activate/{token_id}/")
 async def activate_account(
     token_id: int,
     db: AsyncSession = Depends(get_db),
@@ -195,15 +171,7 @@ async def activate_account(
     )
 
 
-@users_router.post(
-    "/login/",
-    responses={
-        200: {"description": "User logged in and got new access and refresh tokens"},
-        404: {"description": "User not found"},
-        401: {"description": "Invalid password"},
-        403: {"description": "User account is not activated"},
-    },
-)
+@users_router.post("/login/")
 async def user_login(user_data: UserLoginSchema, db: AsyncSession = Depends(get_db)):
     """
     Log in to registered user account and get access and refresh tokens.
@@ -236,16 +204,7 @@ async def user_login(user_data: UserLoginSchema, db: AsyncSession = Depends(get_
     )
 
 
-@users_router.post(
-    "/logout/",
-    responses={
-        200: {"description": "User logged out and his refresh token deleted"},
-        404: {"description": "User not found"},
-        401: {
-            "description": "Invalid authorization header formal or invalid/expired token"
-        },
-    },
-)
+@users_router.post("/logout/")
 async def user_logout(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Log out user account
@@ -281,19 +240,7 @@ async def user_logout(request: Request, db: AsyncSession = Depends(get_db)):
     )
 
 
-@users_router.post(
-    "/change-password/",
-    responses={
-        200: {"description": "password changed to a new one"},
-        401: {
-            "description": "Invalid authorization header format or invalid/expired token"
-        },
-        404: {"description": "User not found"},
-        400: {
-            "description": "Provided old password is not the same as it's hashed version"
-        },
-    },
-)
+@users_router.post("/change-password/")
 async def change_user_password(
     request: Request,
     user_data: UserChangePasswordSchema,
@@ -336,17 +283,7 @@ async def change_user_password(
     )
 
 
-@users_router.post(
-    "/reset-password-request/",
-    responses={
-        200: {
-            "description": "Email with instructions is sent, reset password token deleted"
-        },
-        404: {"description": "User not found"},
-        400: {"description": "User is not active"},
-        500: {"description": "Internal error during email sending"},
-    },
-)
+@users_router.post("/reset-password-request/")
 async def reset_user_password_request(
     user_data: UserResetPasswordRequestSchema, db: AsyncSession = Depends(get_db)
 ):
@@ -393,14 +330,7 @@ async def reset_user_password_request(
     )
 
 
-@users_router.post(
-    "/reset-password-complete/",
-    responses={
-        200: {"description": "Password changed to a new one"},
-        404: {"description": "User not found"},
-        401: {"description": "Reset token is invalid or expired"},
-    },
-)
+@users_router.post("/reset-password-complete/")
 async def reset_user_password_complete(
     user_data: UserResetPasswordCompleteSchema,
     db: AsyncSession = Depends(get_db),
@@ -435,16 +365,7 @@ async def reset_user_password_complete(
     )
 
 
-@users_router.post(
-    "/refresh-access-token/",
-    responses={
-        200: {
-            "description": "New access and refresh tokens are created (old refresh token is deleted)"
-        },
-        401: {"description": "Old refresh token is invalid or expired"},
-        404: {"description": "User not found"},
-    },
-)
+@users_router.post("/refresh-access-token/")
 async def refresh_user_access_token(
     user_data: UserRefreshAccessTokenSchema, db: AsyncSession = Depends(get_db)
 ):
@@ -485,16 +406,7 @@ async def refresh_user_access_token(
     )
 
 
-@users_router.patch(
-    "/{user_id}/make-admin/",
-    responses={
-        200: {"description": "User group changed to 'admin'"},
-        400: {
-            "description": "User can not change his own group or user is already an admin"
-        },
-        404: {"description": "User not found"},
-    },
-)
+@users_router.patch("/{user_id}/make-admin/")
 async def make_admin(
     user_id: int,
     current_user=Depends(require_admin),
@@ -521,16 +433,7 @@ async def make_admin(
     )
 
 
-@users_router.patch(
-    "/{user_id}/make-moderator/",
-    responses={
-        200: {"description": "User group changed to 'moderator'"},
-        400: {
-            "description": "User can not change his own group or user is already a moderator"
-        },
-        404: {"description": "User not found"},
-    },
-)
+@users_router.patch("/{user_id}/make-moderator/")
 async def make_moderator(
     user_id: int,
     current_user=Depends(require_admin),
@@ -558,16 +461,7 @@ async def make_moderator(
     )
 
 
-@users_router.patch(
-    "/{user_id}/make-user/",
-    responses={
-        200: {"description": "User group changed to 'user'"},
-        400: {
-            "description": "User can not change his own group or user is already in 'user' group"
-        },
-        404: {"description": "User not found"},
-    },
-)
+@users_router.patch("/{user_id}/make-user/")
 async def make_user(
     user_id: int,
     current_user=Depends(require_admin),
@@ -595,14 +489,7 @@ async def make_user(
     )
 
 
-@users_router.patch(
-    "/{user_id}/activate_user/",
-    responses={
-        200: {"description": "User activated"},
-        404: {"description": "User not found"},
-        400: {"description": "User is already active"},
-    },
-)
+@users_router.patch("/{user_id}/activate_user/")
 async def activate_user_by_id(
     user_id: int,
     current_user=Depends(require_admin),
