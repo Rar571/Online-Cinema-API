@@ -166,7 +166,7 @@ async def movie_create(
     current_user=Depends(require_moderator),
 ):
     """
-    Creates a new movie.
+    Creates a new movie (available for moderator and admin).
     """
     return await create_movie(movie_data=movie_data, db=db)
 
@@ -186,7 +186,7 @@ async def genre_create(
     current_user=Depends(require_moderator),
 ):
     """
-    Creates a new genre.
+    Creates a new genre (available for moderator and admin).
     """
     return await create_genre(genre_data=genre_data, db=db)
 
@@ -226,7 +226,7 @@ async def create_star(
     current_user=Depends(require_moderator),
 ):
     """
-    Creates a new star.
+    Creates a new star (available for moderator and admin).
     """
     return await create_actor(actor_data=star_data, db=db)
 
@@ -324,7 +324,7 @@ async def update_movie(
     current_user=Depends(require_moderator),
 ):
     """
-    Updates a movie and responds with a detailed one.
+    Updates a movie and responds with a detailed one (available for moderator and admin).
     """
     return await movie_update(movie_id=movie_id, movie_data=movie_data, db=db)
 
@@ -336,7 +336,7 @@ async def delete_movie(
     current_user=Depends(require_moderator),
 ):
     """
-    Deletes a movie if it is not purchased.
+    Deletes a movie if it is not purchased (available for moderator and admin).
     """
     return await movie_delete(movie_id=movie_id, db=db)
 
@@ -357,7 +357,7 @@ async def genre_update(
     current_user=Depends(require_moderator),
 ):
     """
-    Updates a genre and responds with a detailed one.
+    Updates a genre and responds with a detailed one (available for moderator and admin).
     """
     return await update_genre(genre_id=genre_id, genre_data=genre_data, db=db)
 
@@ -369,7 +369,7 @@ async def genre_delete(
     current_user=Depends(require_moderator),
 ):
     """
-    Deletes a genre.
+    Deletes a genre (available for moderator and admin).
     """
     return await delete_genre(genre_id=genre_id, db=db)
 
@@ -422,7 +422,7 @@ async def update_star(
     current_user=Depends(require_moderator),
 ):
     """
-    Updates a star
+    Updates a star (available for moderator and admin).
     """
     return await update_actor(actor_id=star_id, actor_data=star_data, db=db)
 
@@ -434,6 +434,6 @@ async def delete_star(
     current_user=Depends(require_moderator),
 ):
     """
-    Deletes a star
+    Deletes a star (available for moderator and admin).
     """
     return await delete_actor(actor_id=star_id, db=db)
