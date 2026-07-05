@@ -28,6 +28,9 @@ async def pay_for_order(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
+    """
+    Creates a session url for payment.
+    """
     return await create_checkout_session(
         order_id=order_id, db=db, current_user=current_user
     )
@@ -38,6 +41,9 @@ async def webhook(
     request: Request,
     db: AsyncSession = Depends(get_db)
 ):
+    """
+    Changes order status to 'paid' and creates a new payment.
+    """
     return await stripe_webhook(request=request, db=db)
 
 
@@ -46,6 +52,9 @@ async def payments_for_user(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
+    """
+    Gets payments list for current user.
+    """
     return await user_payment_history(db=db, current_user=current_user)
 
 
@@ -57,6 +66,9 @@ async def all_payments(
     dates: list[datetime] | None = None,
     statuses: list[StatusEnum] | None = None,
 ):
+    """
+    Gets all payments list with filters (available only for admin).
+    """
     await require_admin(current_user=current_user)
     return await view_all_payment_history(
         db=db,
