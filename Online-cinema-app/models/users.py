@@ -115,7 +115,7 @@ class ActivationTokenModel(Base):
         "UserModel", back_populates="activation_token"
     )
     token: Mapped[str] = mapped_column(
-        String(64), default=generate_token, nullable=False, unique=True
+        String(500), default=generate_token, nullable=False, unique=True
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -135,7 +135,7 @@ class PasswordResetTokenModel(Base):
         "UserModel", back_populates="password_reset_token"
     )
     token: Mapped[str] = mapped_column(
-        String(64), default=generate_token, unique=True, nullable=False
+        String(500), default=generate_token, unique=True, nullable=False
     )
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -154,7 +154,7 @@ class RefreshTokenModel(Base):
     user: Mapped["UserModel"] = relationship(
         "UserModel", back_populates="refresh_token"
     )
-    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    token: Mapped[str] = mapped_column(String(500), unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
