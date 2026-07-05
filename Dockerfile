@@ -1,6 +1,7 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 WORKDIR /app
 COPY requirements.txt ./
+RUN pip install --upgrade pip setuptools wheel
 RUN pip install --no-cache -r requirements.txt
 COPY Online-cinema-app .
 ENV PYTHONPATH=/app
