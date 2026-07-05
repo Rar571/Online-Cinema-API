@@ -43,13 +43,11 @@ async def register_user(
 ):
     """
     Register new user account.
-
-    Returns:
-        201: User registered, activation email sent
-        409: Email already exists
-        500: Internal error during user creation
     """
-    existing_user = get_user_by_email(user_email=user_data.email, db=db)
+    existing_user_result = await db.execute(
+        select(UserModel).where(UserModel.email == user_data.email)
+    )
+    existing_user = existing_user_result.scalar_one_or_none()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -86,7 +84,7 @@ async def register_user(
         return JSONResponse(
             status_code=status.HTTP_201_CREATED,
             content={
-                "detail": f"User was registered successfully."
+                "detail": f"User was registered successfully. "
                 f"The email with activation token has been "
                 f"already sent to your {user_data.email}"
             },
@@ -99,13 +97,6 @@ async def get_new_activation_token(
 ):
     """
     Get new activation token via email if user is registered and his old token is expired.
-
-    Returns:
-        201: New activation token created, activation email sent
-        404: User is not found
-        400: User is already active
-        400: Old token is still valid
-        500: Internal error during email sending
     """
     user = await get_user_by_email(user_email=user_data.email, db=db)
     if user.is_active:
@@ -154,12 +145,6 @@ async def activate_account(
 ):
     """
     Activate user account with activation token and email.
-
-    Returns:
-        200: User account activated
-        404: User is not found
-        401: Token is invalid or expired
-        400: User is already active
     """
     user = await get_user_by_email(user_email=email, db=db)
     result_token = await db.execute(
@@ -189,13 +174,7 @@ async def activate_account(
 @users_router.post("/login/")
 async def user_login(user_data: UserLoginSchema, db: AsyncSession = Depends(get_db)):
     """
-    Log in to registered user account and get access and refresh tokens
-
-    Returns:
-        200: User logged in and got new access and refresh tokens
-        404: User is not found
-        401: Invalid password
-        403: User account is not activated
+    Log in to registered user account and get access and refresh tokens.
     """
     user = await get_user_by_email(user_email=user_data.email, db=db)
     hashed_password = user._hashed_password
@@ -229,11 +208,6 @@ async def user_login(user_data: UserLoginSchema, db: AsyncSession = Depends(get_
 async def user_logout(request: Request, db: AsyncSession = Depends(get_db)):
     """
     Log out user account
-
-    Returns:
-        200: User logged out and his refresh token deleted
-        401: Invalid authorization header formal
-        401: Invalid or expired token
     """
     headers = request.headers.get("Authorization")
     if not headers:
@@ -274,13 +248,6 @@ async def change_user_password(
 ):
     """
     Change user password if he remembers the old one
-
-    Returns:
-        200: password changed to a new one
-        401: Invalid authorization header format
-        401: Invalid or expired token
-        404: User not found
-        400: Provided old password is not the same as it's hashed version
     """
     headers = request.headers.get("Authorization")
     if not headers:
@@ -323,12 +290,6 @@ async def reset_user_password_request(
     """
     Reset user password via request if user does not remember old password, but he remembers an email.
     Endpoint always shows the same message for safety.
-
-    Returns:
-        200: Email with instructions is sent, reset password token deleted
-        404: User not found
-        400: User is not active
-        500: Internal error during email sending
     """
     user = await get_user_by_email(user_email=user_data.email, db=db)
     if not user.is_active:
@@ -377,11 +338,6 @@ async def reset_user_password_complete(
 ):
     """
     Complete password reset via email.
-
-    Returns:
-        200: Password changed to a new one
-        404: User not found
-        401: Reset token is invalid or expired
     """
     user = await get_user_by_email(user_email=user_data.email, db=db)
     reset_token_result = await db.execute(
@@ -415,11 +371,6 @@ async def refresh_user_access_token(
 ):
     """
     Get new access and refresh tokens if user old refresh token is valid.
-
-    Returns:
-        200: New access and refresh tokens are created (old refresh token is deleted)
-        401: Old refresh token is invalid or expired
-        404: User not found
     """
     refresh_token_result = await db.execute(
         select(RefreshTokenModel).where(
@@ -463,12 +414,6 @@ async def make_admin(
 ):
     """
     Change user group to 'admin' (available only for admin)
-
-    Returns:
-        200: User group changed to admin
-        400: User can not change his own group
-        404: User not found
-        400: User is already an admin
     """
     if user_id == current_user.id:
         raise HTTPException(
@@ -495,14 +440,8 @@ async def make_moderator(
     db: AsyncSession = Depends(get_db),
 ):
     """
-      Change user group to 'moderator' (available only for admin)
-
-      Returns:
-          200: User group changed to 'moderator'
-          400: User can not change his own group
-          404: User not found
-          400: User is already a moderator
-      """
+    Change user group to 'moderator' (available only for admin)
+    """
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -529,14 +468,8 @@ async def make_user(
     db: AsyncSession = Depends(get_db),
 ):
     """
-      Change user group to 'user' (available only for admin)
-
-      Returns:
-          200: User group changed to 'user'
-          400: User can not change his own group
-          404: User not found
-          400: User is already in 'user' group
-      """
+    Change user group to 'user' (available only for admin)
+    """
     if user_id == current_user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -564,11 +497,6 @@ async def activate_user_by_id(
 ):
     """
     Activate user account manually (available only for admin)
-
-    Returns:
-        200: User activated
-        404: User not found
-        400: User is already active
     """
     user = await get_user_by_id(user_id=user_id, db=db)
     if user.is_active:
