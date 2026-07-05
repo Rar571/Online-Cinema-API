@@ -6,6 +6,19 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+.idea/
+.vscode/
+*.db
+*.sqlite
+.env
+.pytest_cache/
+.coverage
+htmlcov/
 
 # C extensions
 *.so
