@@ -15,6 +15,7 @@ from dependencies.users import get_current_user_model
 from models.users import UserModel
 from schemas.shopping_cart import CartAddSchema
 
+
 cart_router = APIRouter()
 
 
@@ -23,6 +24,9 @@ async def cart_list(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
+    """
+    Gets movies list in current user cart.
+    """
     return await cart_movies_list(db=db, current_user=current_user)
 
 
@@ -32,6 +36,9 @@ async def add_movie(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
+    """
+    Adds a specific movie to current user cart.
+    """
     return await add_movie_to_cart(
         movie_data=movie_data, db=db, current_user=current_user
     )
@@ -42,6 +49,9 @@ async def clear_user_cart(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
+    """
+    Clears all movies from current user cart.
+    """
     return await clear_cart(db=db, current_user=current_user)
 
 
@@ -50,6 +60,9 @@ async def pay_for_user_cart(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
+    """
+    Creates an order with all movies from the current user cart.
+    """
     return await pay_for_cart(db=db, current_user=current_user)
 
 
@@ -59,6 +72,9 @@ async def delete_movie_from_cart(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
+    """
+    Deletes a movie from current user cart.
+    """
     return await remove_movie_from_cart(
         movie_id=movie_id, db=db, current_user=current_user
     )
@@ -70,5 +86,8 @@ async def view_cart(
     db: AsyncSession = Depends(get_db),
     current_user: UserModel = Depends(get_current_user_model),
 ):
+    """
+    View cart of a specific user (only for admin).
+    """
     await require_admin(current_user=current_user)
     return await view_user_cart(user_id=user_id, db=db, current_user=current_user)
