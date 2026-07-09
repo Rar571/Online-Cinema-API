@@ -61,7 +61,7 @@ The entire system (FastAPI app, PostgreSQL, Redis, Celery workers) is containeri
 
 1. **Clone the repository:**
 ```bash
-git clone [https://github.com/Rar571/online-cinema-api.git](https://github.com/Rar571/online-cinema-api.git)
+git clone [https://github.com/Rar571/online-cinema-API.git](https://github.com/Rar571/online-cinema-API.git)
 cd online-cinema-api
 ```
 
