@@ -1,0 +1,75 @@
+import os
+from dotenv import load_dotenv
+import pytest
+import pytest_asyncio
+from unittest.mock import AsyncMock, MagicMock
+
+from httpx import AsyncClient, ASGITransport
+
+from dependencies.authorization import require_moderator, group_moderators_id, group_admins_id, require_admin
+from dependencies.users import get_current_user_model
+from main import app
+from db.session_postgresql import get_db
+import dependencies.authorization as auth_module
+import routes.users as users_router_module
+import tests.test_users as test_users_module
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+
+
+@pytest.fixture
+def mock_db():
+    session = AsyncMock()
+    session.execute = AsyncMock(return_value=MagicMock())
+    session.add = MagicMock()
+    session.delete = AsyncMock()
+    session.commit = AsyncMock()
+    session.refresh = AsyncMock()
+    return session
+
+
+@pytest_asyncio.fixture
+async def client(mock_db):
+
+    async def override_get_db():
+        yield mock_db
+
+    def override_require_moderator():
+        return MagicMock(id=1, group_id=group_moderators_id)
+
+    def override_require_admin():
+        return MagicMock(id=2, group_id=group_admins_id)
+
+    def override_get_current_user_model():
+        return MagicMock(id=3, is_active=True)
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[require_moderator] = override_require_moderator
+    app.dependency_overrides[require_admin] = override_require_admin
+    app.dependency_overrides[get_current_user_model] = override_get_current_user_model
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        yield ac
+
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def set_group_ids():
+    auth_module.group_admins_id = 1
+    auth_module.group_moderators_id = 2
+    auth_module.group_users_id = 3
+
+    users_router_module.group_admins_id = 1
+    users_router_module.group_moderators_id = 2
+    users_router_module.group_users_id = 3
+
+    test_users_module.group_admins_id = 1
+    test_users_module.group_moderators_id = 2
+    test_users_module.group_users_id = 3
+    yield
+
+
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
